@@ -1,0 +1,6 @@
+/continuum-plugin-guest-pass
+/web/dist
+/web/node_modules
+/web/*.tsbuildinfo
+/web/vite.config.d.ts
+/web/vite.config.js

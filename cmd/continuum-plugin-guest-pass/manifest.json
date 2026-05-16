@@ -1,0 +1,111 @@
+{
+  "plugin_id": "continuum.guest-pass",
+  "version": "0.1.0",
+  "checksum": "__CHECKSUM__",
+  "continuum_api_version": "v1",
+  "supported_platforms": [
+    {
+      "os": "linux",
+      "arch": "amd64"
+    }
+  ],
+  "capabilities": [
+    {
+      "type": "http_routes.v1",
+      "id": "guest-pass",
+      "display_name": "Guest Pass",
+      "description": "Temporary public links for tightly scoped media access."
+    },
+    {
+      "type": "scheduled_task.v1",
+      "id": "maintenance",
+      "display_name": "Guest pass maintenance",
+      "description": "Prunes old guest-pass audit events.",
+      "cron": "17 */6 * * *"
+    }
+  ],
+  "http_routes": [
+    {
+      "id": "admin_api",
+      "method": "*",
+      "path": "/api/admin/*",
+      "access": "admin"
+    },
+    {
+      "id": "public_api",
+      "method": "*",
+      "path": "/api/public/*",
+      "access": "public"
+    },
+    {
+      "id": "assets",
+      "method": "GET",
+      "path": "/assets/*",
+      "access": "public"
+    },
+    {
+      "id": "pass_page",
+      "method": "GET",
+      "path": "/p/*",
+      "access": "public"
+    },
+    {
+      "id": "admin_page",
+      "method": "GET",
+      "path": "/admin/*",
+      "access": "admin",
+      "navigable": true,
+      "navigation_label": "Guest Passes",
+      "navigation_kind": "admin"
+    }
+  ],
+  "global_config_schema": [
+    {
+      "key": "database_url",
+      "title": "Postgres connection string",
+      "description": "DSN for the dedicated guest_pass schema (e.g. postgres://plugin_guest_pass:...@host:5432/continuum?search_path=guest_pass&sslmode=disable).",
+      "json_schema": "{\"type\":\"object\",\"properties\":{\"value\":{\"type\":\"string\"}},\"required\":[\"value\"]}",
+      "required": true,
+      "admin_form": {
+        "fields": [
+          {
+            "key": "value",
+            "label": "Connection URL",
+            "control": "ADMIN_FORM_CONTROL_TEXT",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "key": "public_base_url",
+      "title": "Public base URL",
+      "description": "Optional absolute URL used when returning share links. Leave empty to return relative plugin URLs.",
+      "json_schema": "{\"type\":\"object\",\"properties\":{\"value\":{\"type\":\"string\"}}}",
+      "admin_form": {
+        "fields": [
+          {
+            "key": "value",
+            "label": "Public URL",
+            "control": "ADMIN_FORM_CONTROL_TEXT"
+          }
+        ]
+      }
+    },
+    {
+      "key": "audit_retention_days",
+      "title": "Audit retention days",
+      "description": "How long to retain guest-pass event rows after creation. Defaults to 180.",
+      "json_schema": "{\"type\":\"object\",\"properties\":{\"value\":{\"type\":\"integer\",\"minimum\":1}}}",
+      "admin_form": {
+        "fields": [
+          {
+            "key": "value",
+            "label": "Retention days",
+            "control": "ADMIN_FORM_CONTROL_NUMBER"
+          }
+        ]
+      }
+    }
+  ]
+}
