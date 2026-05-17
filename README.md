@@ -1,33 +1,52 @@
-# continuum-plugin-guest-pass
+# Guest Pass for Continuum
 
-Temporary public links for tightly scoped Continuum media access.
+`continuum.guest-pass` creates temporary public links for tightly scoped media
+access. It is meant for short-lived sharing workflows where an authenticated
+Continuum user grants access to a specific media item without creating a full
+account for the recipient.
 
-## Capabilities
+The plugin uses Continuum host APIs for scoped stream grants and keeps its own
+audit trail in a dedicated Postgres schema.
 
-| Capability | Notes |
-|---|---|
-| `http_routes.v1` | Admin API/UI and public guest pass pages. |
-| `scheduled_task.v1` | Prunes old audit events. |
+## Features
 
-## Current scope
+- Creates temporary guest access links.
+- Supports a configurable public base URL for reverse-proxied deployments.
+- Records guest-pass audit events.
+- Scheduled maintenance prunes old audit data.
+- Strips and validates public request context through Continuum's scoped access
+  model rather than exposing broad library permissions.
 
-This first version ships an embedded Vite/React SPA for the admin and guest screens. It manages pass creation, validation, expiry, revocation, open/play limits, PINs, first-IP locking, IP allowlists, country/geofence checks, device limits, concurrent scoped-grant limits, and audit events.
+## Configuration
 
-For `media_file` targets, it asks Continuum's RuntimeHost for a narrowly scoped guest stream grant and passes through watch-time limits, resolution caps, direct-play/download flags, seeking policy, and watermark policy.
+| Key | Required | Description |
+|---|---|---|
+| `database_url` | yes | Postgres DSN for the `guest_pass` schema. |
+| `public_base_url` | no | Absolute URL used when returning share links. Empty returns relative plugin URLs. |
+| `audit_retention_days` | no | How long to retain guest-pass audit rows. Defaults to 180 days. |
 
-Watermarks support visible browser overlays, burned-in ffmpeg overlays, forensic token metadata, or all three. Text templates can include pass id, IP, device id, subject, title, and time. Logo overlays are supported by URL for visible playback and by local absolute file path for burned-in playback.
+Example DSN:
 
-## Install
+```text
+postgres://plugin_guest_pass:password@postgres:5432/continuum?search_path=guest_pass&sslmode=disable
+```
+
+## Database Setup
 
 ```sql
-CREATE ROLE plugin_guest_pass LOGIN PASSWORD '<chosen>';
+CREATE ROLE plugin_guest_pass WITH LOGIN PASSWORD '<chosen>';
 CREATE SCHEMA guest_pass AUTHORIZATION plugin_guest_pass;
 GRANT CONNECT ON DATABASE continuum TO plugin_guest_pass;
 ```
 
-Configure `database_url` with `search_path=guest_pass`.
+## Operations
 
-## Build & test
+- Put public guest-pass routes behind HTTPS.
+- Set `public_base_url` when Continuum sits behind a reverse proxy and returned
+  links need an absolute external origin.
+- Keep audit retention aligned with your privacy policy.
+
+## Build And Test
 
 ```bash
 make build
