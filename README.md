@@ -8,6 +8,10 @@ account for the recipient.
 The plugin uses Continuum host APIs for scoped stream grants and keeps its own
 audit trail in a dedicated Postgres schema.
 
+## Detailed Operations Docs
+
+- [Setup, debugging, and communication flows](docs/setup-debug-flows.md)
+
 ## Features
 
 - Creates temporary guest access links.
