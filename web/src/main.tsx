@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Copy, ExternalLink, RefreshCcw, Shield, Trash2 } from "lucide-react";
+import { mountPath } from "./mountPath";
 import "./styles.css";
 
 type Pass = {
@@ -56,11 +57,6 @@ type PlayResponse = {
   watermark?: string;
   logo_url?: string;
 };
-
-function mountPath(): string {
-  const match = window.location.pathname.match(/^(\/api\/v1\/plugins\/\d+)/);
-  return match ? match[1] : "";
-}
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${mountPath()}${path}`, {

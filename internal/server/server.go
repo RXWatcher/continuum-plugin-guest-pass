@@ -44,6 +44,7 @@ func New(d Deps) http.Handler {
 	r.Use(middleware.Recoverer)
 
 	r.Route("/api/admin", func(r chi.Router) {
+		r.Use(requireStore(d))
 		r.Use(requireAdmin)
 		r.Get("/passes", hListPasses(d))
 		r.Post("/passes", hCreatePass(d))
@@ -52,6 +53,7 @@ func New(d Deps) http.Handler {
 	})
 
 	r.Route("/api/public", func(r chi.Router) {
+		r.Use(requireStore(d))
 		r.Get("/passes/{token}", hPublicPass(d, false))
 		r.Post("/passes/{token}/open", hPublicPass(d, true))
 		r.Post("/passes/{token}/play", hPlayAttempt(d))
@@ -64,6 +66,18 @@ func New(d Deps) http.Handler {
 		r.Get("/admin", hSPA(d))
 	}
 	return r
+}
+
+func requireStore(d Deps) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if d.Store == nil {
+				writeErr(w, http.StatusServiceUnavailable, "not_configured", "guest pass plugin is not configured")
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 func requireAdmin(next http.Handler) http.Handler {

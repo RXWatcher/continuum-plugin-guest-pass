@@ -8,13 +8,18 @@ build: web-build
 	$(GO) build -o $(BINARY) ./cmd/continuum-plugin-guest-pass
 
 web-deps:
-	cd web && $(PNPM) install
+	cd web && $(PNPM) install --frozen-lockfile
 
 web-build: web-deps
 	cd web && $(PNPM) build
 
-test:
+test: test-go test-web
+
+test-go:
 	$(GO) test ./...
+
+test-web:
+	cd web && $(PNPM) run test --run
 
 clean:
 	rm -f $(BINARY)
