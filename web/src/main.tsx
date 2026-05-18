@@ -142,7 +142,7 @@ function AdminPage() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [form, setForm] = useState({
     title: "",
-    target_type: "movie",
+    target_type: "media_file",
     target_id: "",
     note: "",
     expires_in_hours: 24,

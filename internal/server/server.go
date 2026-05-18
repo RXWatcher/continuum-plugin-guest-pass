@@ -175,7 +175,7 @@ func hCreatePass(d Deps) http.HandlerFunc {
 			return
 		}
 		if !validTargetType(req.TargetType) {
-			writeErr(w, http.StatusBadRequest, "bad_target_type", "target_type must be movie, episode, series, collection, watch_room, ebook, or audiobook")
+			writeErr(w, http.StatusBadRequest, "bad_target_type", "target_type must be media_file")
 			return
 		}
 		if req.RequirePIN && strings.TrimSpace(req.PIN) == "" {
@@ -588,12 +588,7 @@ func parseExpiry(raw string, hours int) (time.Time, error) {
 }
 
 func validTargetType(v string) bool {
-	switch v {
-	case "media_file", "movie", "episode", "series", "collection", "watch_room", "ebook", "audiobook":
-		return true
-	default:
-		return false
-	}
+	return v == "media_file"
 }
 
 func catalogMediaTypes(raw string) []string {

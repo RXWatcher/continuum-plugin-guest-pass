@@ -54,3 +54,14 @@ func TestParseExpiryValidation(t *testing.T) {
 		t.Fatalf("default expiry = %s, want about 24h from now", got)
 	}
 }
+
+func TestValidTargetTypeOnlyAllowsPlayableMediaFile(t *testing.T) {
+	if !validTargetType("media_file") {
+		t.Fatal("media_file should be accepted")
+	}
+	for _, targetType := range []string{"movie", "episode", "series", "collection", "watch_room", "ebook", "audiobook", ""} {
+		if validTargetType(targetType) {
+			t.Fatalf("target type %q should be rejected until playback grants support it", targetType)
+		}
+	}
+}
