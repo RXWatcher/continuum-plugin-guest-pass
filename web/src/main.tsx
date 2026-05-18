@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Copy, ExternalLink, RefreshCcw, Search, Shield, Trash2 } from "lucide-react";
+import { ArrowLeft, Copy, ExternalLink, RefreshCcw, Search, Shield, Trash2 } from "lucide-react";
 import { mountPath } from "./mountPath";
 import "./styles.css";
 
@@ -274,6 +274,10 @@ function AdminPage() {
     <main className="app-shell">
       <header className="topbar">
         <div>
+          <a className="back-link" href="/admin/plugins" title="Back to Continuum plugins">
+            <ArrowLeft size={16} />
+            <span>Continuum</span>
+          </a>
           <p className="eyebrow">Plugin administration</p>
           <h1>Guest Passes</h1>
           <p className="subhead">Issue temporary media access links and monitor pass usage.</p>

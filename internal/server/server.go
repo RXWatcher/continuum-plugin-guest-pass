@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"io/fs"
 	"net"
@@ -498,10 +499,27 @@ func hSPA(d Deps) http.HandlerFunc {
 		}
 		baseHref := pluginBaseHref(r)
 		body = []byte(strings.Replace(string(body), "<head>", `<head><base href="`+baseHref+`">`, 1))
+		body = injectTheme(body, r)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
 		_, _ = w.Write(body)
 	}
+}
+
+func injectTheme(body []byte, r *http.Request) []byte {
+	theme := r.Header.Get("X-Continuum-Theme")
+	if theme == "" {
+		theme = r.URL.Query().Get("theme")
+	}
+	if theme == "" {
+		return body
+	}
+	safe := html.EscapeString(theme)
+	htmlBody := string(body)
+	if strings.Contains(htmlBody, "<html ") {
+		return []byte(strings.Replace(htmlBody, "<html ", `<html data-theme="`+safe+`" `, 1))
+	}
+	return []byte(strings.Replace(htmlBody, "<html>", `<html data-theme="`+safe+`">`, 1))
 }
 
 func loadIndex(webFS fs.FS) ([]byte, error) {

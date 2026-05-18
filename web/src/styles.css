@@ -29,6 +29,78 @@
   font-family: var(--font-body);
 }
 
+[data-theme="cinema-light"] {
+  color-scheme: light;
+  --background: #f7f3ed;
+  --foreground: #201c18;
+  --card: #fffaf3;
+  --surface: #fffaf3;
+  --surface-hover: #efe7dc;
+  --surface-raised: #e8ded1;
+  --primary: #7c2d12;
+  --primary-foreground: #fffaf3;
+  --secondary: #efe7dc;
+  --secondary-foreground: #3c332a;
+  --muted: #efe7dc;
+  --muted-foreground: #74675a;
+  --accent: #e7d3bd;
+  --accent-foreground: #241b12;
+  --border: #ded1c0;
+  --input: #fffaf3;
+  --ring: #7c2d12;
+}
+
+[data-theme="cobalt-studio"] {
+  --background: #101623;
+  --foreground: #eef4ff;
+  --card: #172033;
+  --surface: #172033;
+  --surface-hover: #1e2a42;
+  --surface-raised: #263553;
+  --primary: #60a5fa;
+  --primary-foreground: #07111f;
+  --muted-foreground: #9fb2d0;
+  --accent: #203657;
+  --accent-foreground: #eef4ff;
+  --border: #2d3f61;
+  --input: #121c2f;
+  --ring: #60a5fa;
+}
+
+[data-theme="oxblood-noir"] {
+  --background: #170b10;
+  --foreground: #fff1f4;
+  --card: #241018;
+  --surface: #241018;
+  --surface-hover: #311720;
+  --surface-raised: #3d1d28;
+  --primary: #fb7185;
+  --primary-foreground: #21070d;
+  --muted-foreground: #c59aa6;
+  --accent: #3a1824;
+  --accent-foreground: #fff1f4;
+  --border: #4a2230;
+  --input: #211018;
+  --ring: #fb7185;
+}
+
+[data-theme="evergreen-studio"] {
+  --background: #0d1712;
+  --foreground: #ecfdf3;
+  --card: #14241b;
+  --surface: #14241b;
+  --surface-hover: #1b3024;
+  --surface-raised: #243c2e;
+  --primary: #6ee7b7;
+  --primary-foreground: #06150f;
+  --muted-foreground: #9bc7b2;
+  --accent: #1d3b2b;
+  --accent-foreground: #ecfdf3;
+  --border: #2b4b39;
+  --input: #102017;
+  --ring: #6ee7b7;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -111,6 +183,27 @@ label {
   color: var(--muted-foreground);
   font-size: 13px;
   font-weight: 650;
+}
+
+.back-link {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 10px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 4px);
+  color: var(--muted-foreground);
+  padding: 6px 10px;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 700;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.back-link:hover {
+  background: var(--accent);
+  color: var(--accent-foreground);
 }
 
 h1,
