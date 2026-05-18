@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { ArrowLeft, Copy, ExternalLink, RefreshCcw, Search, Shield, Trash2 } from "lucide-react";
+import { Activity, ArrowLeft, Copy, ExternalLink, Printer, RefreshCcw, Search, Shield, Trash2 } from "lucide-react";
 import { mountPath } from "./mountPath";
+import { buildPolicySummary, duplicatePassForm, eventTone, passTemplates } from "./passTools";
 import "./styles.css";
 
 let cachedToken = "";
@@ -74,6 +75,16 @@ type CreateResponse = {
   share_url: string;
 };
 
+type PassEvent = {
+  id: number;
+  pass_id: number;
+  type: string;
+  ip?: string;
+  user_agent?: string;
+  attrs?: Record<string, unknown>;
+  created_at: string;
+};
+
 type PlayResponse = {
   message?: string;
   pass: Pass;
@@ -140,6 +151,9 @@ function AdminPage() {
   const [mediaLoading, setMediaLoading] = useState(false);
   const [mediaError, setMediaError] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [eventsByPass, setEventsByPass] = useState<Record<number, PassEvent[]>>({});
+  const [activeEventsPassID, setActiveEventsPassID] = useState<number | null>(null);
+  const [eventLoading, setEventLoading] = useState<number | null>(null);
   const [form, setForm] = useState({
     title: "",
     target_type: "media_file",
@@ -168,6 +182,7 @@ function AdminPage() {
     per_item_play_count: false,
     geofence: "",
   });
+  const policySummary = useMemo(() => buildPolicySummary(form), [form]);
 
   async function load() {
     setLoading(true);
@@ -258,6 +273,54 @@ function AdminPage() {
     }
   }
 
+  function applyTemplate(templateID: string) {
+    const template = passTemplates.find((item) => item.id === templateID);
+    if (!template) return;
+    setForm((current) => ({ ...current, ...template.values }));
+    setShowAdvanced(true);
+  }
+
+  function duplicate(pass: Pass) {
+    const draft = duplicatePassForm({
+      ...pass,
+      expires_in_hours: 24,
+      pin: "",
+      ip_allowlist: pass.ip_allowlist,
+      country_allowlist: pass.country_allowlist,
+      geofence: pass.geofence,
+    });
+    setForm((current) => ({ ...current, ...draft, target_type: "media_file" }));
+    const fileID = Number(pass.target_id);
+    if (fileID > 0) {
+      setSelectedMedia({
+        title: pass.title,
+        type: "media_file",
+        media_file_id: fileID,
+      });
+    }
+    setShowAdvanced(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function loadEvents(passID: number) {
+    if (activeEventsPassID === passID) {
+      setActiveEventsPassID(null);
+      return;
+    }
+    setActiveEventsPassID(passID);
+    if (eventsByPass[passID]) return;
+    setEventLoading(passID);
+    setError("");
+    try {
+      const data = await api<{ events: PassEvent[] }>(`/api/admin/passes/${passID}/events`);
+      setEventsByPass((current) => ({ ...current, [passID]: data.events ?? [] }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load pass activity");
+    } finally {
+      setEventLoading(null);
+    }
+  }
+
   async function selectMedia(item: MediaItem) {
     if (mediaFileID(item) <= 0) {
       setMediaError("Selected media does not have a playable file.");
@@ -306,6 +369,16 @@ function AdminPage() {
               <p className="panel-subtitle">Define the target, expiration, playback limits, and access controls.</p>
             </div>
             <span className="badge">New pass</span>
+          </div>
+          <div className="template-grid" aria-label="Guest pass templates">
+            {passTemplates.map((template) => (
+              <button key={template.id} type="button" onClick={() => applyTemplate(template.id)}>
+                <span>
+                  <strong>{template.label}</strong>
+                  <small>{template.description}</small>
+                </span>
+              </button>
+            ))}
           </div>
           <div className="form-section">
             <div className="media-picker wide-field">
@@ -380,6 +453,15 @@ function AdminPage() {
               </select>
             </label>
           </div>
+          <div className="policy-preview">
+            <div>
+              <strong>Policy preview</strong>
+              <span>{selectedMedia ? mediaTitle(selectedMedia) : "Select media to complete the pass."}</span>
+            </div>
+            <ul>
+              {policySummary.map((item) => <li key={item}>{item}</li>)}
+            </ul>
+          </div>
           <button className="text-button" type="button" onClick={() => setShowAdvanced((value) => !value)}>
             {showAdvanced ? "Hide advanced options" : "Advanced options"}
           </button>
@@ -442,6 +524,11 @@ function AdminPage() {
             </>
           )}
           <div className="form-actions">
+            {created && (
+              <button type="button" onClick={() => printInvite(created)}>
+                <Printer size={16} /> Print invite
+              </button>
+            )}
             <button className="primary" type="submit">
               <Shield size={17} /> Create guest pass
             </button>
@@ -483,7 +570,25 @@ function AdminPage() {
                 <button type="button" onClick={() => revoke(pass.id)} aria-label="Revoke">
                   <Trash2 size={16} />
                 </button>
+                <button type="button" onClick={() => duplicate(pass)} aria-label="Duplicate">
+                  <Copy size={16} />
+                </button>
+                <button type="button" onClick={() => void loadEvents(pass.id)} aria-label="Activity">
+                  <Activity size={16} />
+                </button>
               </div>
+              {activeEventsPassID === pass.id && (
+                <div className="event-timeline">
+                  {eventLoading === pass.id ? <p className="muted">Loading activity...</p> : null}
+                  {eventLoading !== pass.id && (eventsByPass[pass.id]?.length ?? 0) === 0 ? <p className="muted">No activity recorded.</p> : null}
+                  {(eventsByPass[pass.id] ?? []).map((event) => (
+                    <div className={`event-row ${eventTone(event.type)}`} key={event.id}>
+                      <span>{event.type.replace(/_/g, " ")}</span>
+                      <small>{formatDate(event.created_at)}{event.ip ? ` · ${event.ip}` : ""}</small>
+                    </div>
+                  ))}
+                </div>
+              )}
             </article>
           ))}
         </section>
@@ -712,6 +817,36 @@ function guestDeviceID() {
 
 async function copy(value: string) {
   await navigator.clipboard.writeText(value);
+}
+
+function printInvite(created: CreateResponse) {
+  const invite = window.open("", "_blank", "width=760,height=640");
+  if (!invite) return;
+  const url = absoluteURL(created.share_url);
+  invite.document.write(`<!doctype html>
+<html>
+<head>
+  <title>Guest Pass Invite</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 48px; color: #111; }
+    h1 { margin: 0 0 12px; font-size: 32px; }
+    p { font-size: 16px; line-height: 1.5; }
+    code { display: block; margin-top: 24px; padding: 16px; border: 1px solid #ccc; overflow-wrap: anywhere; }
+  </style>
+</head>
+<body>
+  <h1>${escapeHTML(created.pass.title)}</h1>
+  <p>Your Continuum guest pass is ready.</p>
+  <code>${escapeHTML(url)}</code>
+</body>
+</html>`);
+  invite.document.close();
+  invite.focus();
+  invite.print();
+}
+
+function escapeHTML(value: string) {
+  return value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;" })[char] || char);
 }
 
 createRoot(document.getElementById("root")!).render(

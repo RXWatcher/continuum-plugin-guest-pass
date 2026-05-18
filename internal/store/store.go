@@ -360,7 +360,38 @@ func (s *Store) SearchPlayableCatalog(ctx context.Context, query string, mediaTy
 	if len(mediaTypes) == 0 {
 		mediaTypes = []string{"movie", "episode"}
 	}
-	rows, err := s.pool.Query(ctx, `
+	rows, err := s.pool.Query(ctx, searchPlayableCatalogSQL(), query, mediaTypes, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]CatalogSearchItem, 0, limit)
+	for rows.Next() {
+		var item CatalogSearchItem
+		if err := rows.Scan(
+			&item.ContentID,
+			&item.MediaFileID,
+			&item.Type,
+			&item.Title,
+			&item.Year,
+			&item.Overview,
+			&item.PosterURL,
+			&item.Genres,
+			&item.RuntimeMinutes,
+			&item.ContentRating,
+			&item.ExternalID,
+			&item.ExternalProvider,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
+func searchPlayableCatalogSQL() string {
+	return `
 WITH normalized AS (
 	SELECT btrim(lower(regexp_replace($1, '[^[:alnum:]]+', ' ', 'g'))) AS q
 )
@@ -403,40 +434,18 @@ JOIN LATERAL (
 ) file_choice ON true
 WHERE mi.type = ANY($2::text[])
 	AND n.q <> ''
-	AND mi.title_normalized LIKE '%' || n.q || '%'
+	AND (
+		mi.title_normalized LIKE n.q || '%'
+		OR lower(COALESCE(mi.tmdb_id, '')) = n.q
+		OR lower(COALESCE(mi.tvdb_id, '')) = n.q
+		OR lower(COALESCE(mi.imdb_id, '')) = n.q
+	)
 ORDER BY
 	CASE WHEN mi.title_normalized = n.q THEN 0 ELSE 1 END,
 	CASE WHEN mi.title_normalized LIKE n.q || '%' THEN 0 ELSE 1 END,
 	COALESCE(mi.year, 0) DESC,
 	mi.title
-LIMIT $3`, query, mediaTypes, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	items := make([]CatalogSearchItem, 0, limit)
-	for rows.Next() {
-		var item CatalogSearchItem
-		if err := rows.Scan(
-			&item.ContentID,
-			&item.MediaFileID,
-			&item.Type,
-			&item.Title,
-			&item.Year,
-			&item.Overview,
-			&item.PosterURL,
-			&item.Genres,
-			&item.RuntimeMinutes,
-			&item.ContentRating,
-			&item.ExternalID,
-			&item.ExternalProvider,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, item)
-	}
-	return items, rows.Err()
+LIMIT $3`
 }
 
 func (s *Store) GetPassByToken(ctx context.Context, token string) (*Pass, error) {

@@ -1,6 +1,7 @@
 package store
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -66,5 +67,15 @@ func TestPINAndIPPolicyHelpers(t *testing.T) {
 	}
 	if p.AllowsIP("198.51.100.2") {
 		t.Fatalf("AllowsIP should reject non-matches")
+	}
+}
+
+func TestCatalogSearchSQLAvoidsLeadingWildcardTitleScan(t *testing.T) {
+	sql := searchPlayableCatalogSQL()
+	if strings.Contains(sql, "LIKE '%' || n.q || '%'") {
+		t.Fatalf("catalog search SQL should avoid leading-wildcard title scans for large libraries")
+	}
+	if !strings.Contains(sql, "LIKE n.q || '%'") {
+		t.Fatalf("catalog search SQL should keep a prefix search path")
 	}
 }
