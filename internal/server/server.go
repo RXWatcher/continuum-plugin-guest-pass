@@ -39,6 +39,22 @@ type passResponse struct {
 	ShareURL           string    `json:"share_url,omitempty"`
 }
 
+type catalogItemResponse struct {
+	ContentID        string   `json:"content_id"`
+	MediaFileID      int      `json:"media_file_id"`
+	Type             string   `json:"type"`
+	Title            string   `json:"title"`
+	Year             int      `json:"year,omitempty"`
+	Overview         string   `json:"overview,omitempty"`
+	PosterURL        string   `json:"poster_url,omitempty"`
+	Genres           []string `json:"genres,omitempty"`
+	RuntimeMinutes   int      `json:"runtime_minutes,omitempty"`
+	ContentRating    string   `json:"content_rating,omitempty"`
+	Playable         bool     `json:"playable"`
+	ExternalID       string   `json:"external_id,omitempty"`
+	ExternalProvider string   `json:"external_provider,omitempty"`
+}
+
 func New(d Deps) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
@@ -50,6 +66,7 @@ func New(d Deps) http.Handler {
 		r.Post("/passes", hCreatePass(d))
 		r.Post("/passes/{id}/revoke", hRevokePass(d))
 		r.Get("/passes/{id}/events", hListEvents(d))
+		r.Get("/catalog/search", hSearchCatalog(d))
 	})
 
 	r.Route("/api/public", func(r chi.Router) {
@@ -247,6 +264,44 @@ func hListEvents(d Deps) http.HandlerFunc {
 	}
 }
 
+func hSearchCatalog(d Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		query := strings.TrimSpace(r.URL.Query().Get("q"))
+		if len(query) < 2 {
+			writeJSON(w, http.StatusOK, map[string]any{"items": []catalogItemResponse{}})
+			return
+		}
+		limit := parseBoundedInt(r.URL.Query().Get("limit"), 20, 1, 50)
+		results, err := d.Store.SearchPlayableCatalog(r.Context(), query, catalogMediaTypes(r.URL.Query().Get("type")), limit)
+		if err != nil {
+			writeErr(w, http.StatusBadGateway, "catalog_search_failed", err.Error())
+			return
+		}
+		items := make([]catalogItemResponse, 0, len(results))
+		for _, item := range results {
+			items = append(items, catalogItemResponse{
+				ContentID:        item.ContentID,
+				MediaFileID:      item.MediaFileID,
+				Type:             item.Type,
+				Title:            item.Title,
+				Year:             item.Year,
+				Overview:         item.Overview,
+				PosterURL:        item.PosterURL,
+				Genres:           item.Genres,
+				RuntimeMinutes:   item.RuntimeMinutes,
+				ContentRating:    item.ContentRating,
+				Playable:         item.MediaFileID > 0,
+				ExternalID:       item.ExternalID,
+				ExternalProvider: item.ExternalProvider,
+			})
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"items": items,
+			"total": len(items),
+		})
+	}
+}
+
 func hPublicPass(d Deps, markOpen bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token := chi.URLParam(r, "token")
@@ -441,7 +496,7 @@ func hSPA(d Deps) http.HandlerFunc {
 			http.Error(w, "spa not available", http.StatusServiceUnavailable)
 			return
 		}
-		baseHref := pluginBaseHref(r.URL.Path)
+		baseHref := pluginBaseHref(r)
 		body = []byte(strings.Replace(string(body), "<head>", `<head><base href="`+baseHref+`">`, 1))
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
@@ -458,18 +513,12 @@ func loadIndex(webFS fs.FS) ([]byte, error) {
 	return io.ReadAll(f)
 }
 
-func pluginBaseHref(path string) string {
-	const marker = "/api/v1/plugins/"
-	i := strings.Index(path, marker)
-	if i < 0 {
-		return "/"
+func pluginBaseHref(r *http.Request) string {
+	mountPath := strings.TrimRight(r.Header.Get("X-Continuum-Plugin-Mount-Path"), "/")
+	if mountPath != "" {
+		return mountPath + "/"
 	}
-	rest := path[i+len(marker):]
-	j := strings.IndexByte(rest, '/')
-	if j < 0 {
-		return path + "/"
-	}
-	return path[:i+len(marker)+j] + "/"
+	return "./"
 }
 
 func mustSub(webFS fs.FS, dir string) fs.FS {
@@ -527,6 +576,33 @@ func validTargetType(v string) bool {
 	default:
 		return false
 	}
+}
+
+func catalogMediaTypes(raw string) []string {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "movie":
+		return []string{"movie"}
+	case "episode":
+		return []string{"episode"}
+	case "series":
+		return []string{"series"}
+	default:
+		return []string{"movie", "episode"}
+	}
+}
+
+func parseBoundedInt(raw string, fallback, minValue, maxValue int) int {
+	value, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil {
+		value = fallback
+	}
+	if value < minValue {
+		return minValue
+	}
+	if value > maxValue {
+		return maxValue
+	}
+	return value
 }
 
 func resolutionHeight(value string) int {

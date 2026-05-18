@@ -75,6 +75,21 @@ type Event struct {
 	CreatedAt time.Time      `json:"created_at"`
 }
 
+type CatalogSearchItem struct {
+	ContentID        string
+	MediaFileID      int
+	Type             string
+	Title            string
+	Year             int
+	Overview         string
+	PosterURL        string
+	Genres           []string
+	RuntimeMinutes   int
+	ContentRating    string
+	ExternalID       string
+	ExternalProvider string
+}
+
 type CreatePassInput struct {
 	Title                    string
 	TargetType               string
@@ -287,6 +302,141 @@ LIMIT $1`, limit)
 		out = append(out, *p)
 	}
 	return out, rows.Err()
+}
+
+func (s *Store) PlayableFileIDs(ctx context.Context, contentIDs []string) (map[string]int, error) {
+	if len(contentIDs) == 0 {
+		return map[string]int{}, nil
+	}
+	rows, err := s.pool.Query(ctx, `
+WITH requested(content_id) AS (
+	SELECT DISTINCT unnest($1::text[])
+),
+ranked AS (
+	SELECT
+		r.content_id,
+		mf.id AS file_id,
+		row_number() OVER (
+			PARTITION BY r.content_id
+			ORDER BY
+				CASE lower(COALESCE(mf.resolution, ''))
+					WHEN '2160p' THEN 1
+					WHEN '4k' THEN 1
+					WHEN '1080p' THEN 2
+					WHEN '720p' THEN 3
+					WHEN '480p' THEN 4
+					ELSE 5
+				END,
+				mf.id
+		) AS rn
+	FROM requested r
+	JOIN public.media_files mf ON (mf.content_id = r.content_id OR mf.episode_id = r.content_id)
+	WHERE mf.missing_since IS NULL
+)
+SELECT content_id, file_id
+FROM ranked
+WHERE rn = 1`, contentIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make(map[string]int, len(contentIDs))
+	for rows.Next() {
+		var contentID string
+		var fileID int
+		if err := rows.Scan(&contentID, &fileID); err != nil {
+			return nil, err
+		}
+		out[contentID] = fileID
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) SearchPlayableCatalog(ctx context.Context, query string, mediaTypes []string, limit int) ([]CatalogSearchItem, error) {
+	if limit <= 0 || limit > 50 {
+		limit = 20
+	}
+	if len(mediaTypes) == 0 {
+		mediaTypes = []string{"movie", "episode"}
+	}
+	rows, err := s.pool.Query(ctx, `
+WITH normalized AS (
+	SELECT btrim(lower(regexp_replace($1, '[^[:alnum:]]+', ' ', 'g'))) AS q
+)
+SELECT
+	mi.content_id,
+	file_choice.id,
+	mi.type,
+	mi.title,
+	COALESCE(mi.year, 0),
+	COALESCE(mi.overview, ''),
+	COALESCE(mi.poster_path, ''),
+	COALESCE(mi.genres, '{}'::text[]),
+	COALESCE(mi.runtime, 0),
+	COALESCE(mi.content_rating, ''),
+	COALESCE(NULLIF(mi.tmdb_id, ''), NULLIF(mi.tvdb_id, ''), NULLIF(mi.imdb_id, ''), ''),
+	CASE
+		WHEN NULLIF(mi.tmdb_id, '') IS NOT NULL THEN 'tmdb'
+		WHEN NULLIF(mi.tvdb_id, '') IS NOT NULL THEN 'tvdb'
+		WHEN NULLIF(mi.imdb_id, '') IS NOT NULL THEN 'imdb'
+		ELSE ''
+	END
+FROM public.media_items mi
+CROSS JOIN normalized n
+JOIN LATERAL (
+	SELECT mf.id
+	FROM public.media_files mf
+	WHERE mf.missing_since IS NULL
+		AND (mf.content_id = mi.content_id OR mf.episode_id = mi.content_id)
+	ORDER BY
+		CASE lower(COALESCE(mf.resolution, ''))
+			WHEN '2160p' THEN 1
+			WHEN '4k' THEN 1
+			WHEN '1080p' THEN 2
+			WHEN '720p' THEN 3
+			WHEN '480p' THEN 4
+			ELSE 5
+		END,
+		mf.id
+	LIMIT 1
+) file_choice ON true
+WHERE mi.type = ANY($2::text[])
+	AND n.q <> ''
+	AND mi.title_normalized LIKE '%' || n.q || '%'
+ORDER BY
+	CASE WHEN mi.title_normalized = n.q THEN 0 ELSE 1 END,
+	CASE WHEN mi.title_normalized LIKE n.q || '%' THEN 0 ELSE 1 END,
+	COALESCE(mi.year, 0) DESC,
+	mi.title
+LIMIT $3`, query, mediaTypes, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]CatalogSearchItem, 0, limit)
+	for rows.Next() {
+		var item CatalogSearchItem
+		if err := rows.Scan(
+			&item.ContentID,
+			&item.MediaFileID,
+			&item.Type,
+			&item.Title,
+			&item.Year,
+			&item.Overview,
+			&item.PosterURL,
+			&item.Genres,
+			&item.RuntimeMinutes,
+			&item.ContentRating,
+			&item.ExternalID,
+			&item.ExternalProvider,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
 }
 
 func (s *Store) GetPassByToken(ctx context.Context, token string) (*Pass, error) {

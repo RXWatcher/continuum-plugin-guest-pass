@@ -24,14 +24,17 @@ func TestAPIReportsNotConfiguredInsteadOfPanicking(t *testing.T) {
 
 func TestPluginBaseHref(t *testing.T) {
 	tests := map[string]string{
-		"/p/token":                         "/",
-		"/api/v1/plugins/guest-pass/admin": "/api/v1/plugins/guest-pass/",
-		"/api/v1/plugins/42/p/token":       "/api/v1/plugins/42/",
-		"/api/v1/plugins/slug":             "/api/v1/plugins/slug/",
+		"":                      "./",
+		"/api/v1/plugins/48":    "/api/v1/plugins/48/",
+		"/api/v1/plugins/slug/": "/api/v1/plugins/slug/",
 	}
-	for path, want := range tests {
-		if got := pluginBaseHref(path); got != want {
-			t.Fatalf("pluginBaseHref(%q) = %q, want %q", path, got, want)
+	for mountPath, want := range tests {
+		req := httptest.NewRequest(http.MethodGet, "/admin", nil)
+		if mountPath != "" {
+			req.Header.Set("X-Continuum-Plugin-Mount-Path", mountPath)
+		}
+		if got := pluginBaseHref(req); got != want {
+			t.Fatalf("pluginBaseHref(%q) = %q, want %q", mountPath, got, want)
 		}
 	}
 }

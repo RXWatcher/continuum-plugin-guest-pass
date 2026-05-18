@@ -1,8 +1,34 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Copy, ExternalLink, RefreshCcw, Shield, Trash2 } from "lucide-react";
+import { Copy, ExternalLink, RefreshCcw, Search, Shield, Trash2 } from "lucide-react";
 import { mountPath } from "./mountPath";
 import "./styles.css";
+
+let cachedToken = "";
+
+function captureTokenFromURL(): void {
+  const params = new URLSearchParams(window.location.search);
+  cachedToken = params.get("token") || "";
+  const theme = params.get("theme") || sessionStorage.getItem("continuum-theme") || "";
+  if (theme) {
+    document.documentElement.dataset.theme = theme;
+    try {
+      sessionStorage.setItem("continuum-theme", theme);
+    } catch {
+      // Ignore storage failures in private browsing contexts.
+    }
+  }
+  if (!params.has("token")) return;
+  params.delete("token");
+  const clean = window.location.pathname + (params.toString() ? `?${params.toString()}` : "") + window.location.hash;
+  window.history.replaceState(null, "", clean);
+}
+
+captureTokenFromURL();
+
+function authHeaders(): Record<string, string> {
+  return cachedToken ? { Authorization: `Bearer ${cachedToken}` } : {};
+}
 
 type Pass = {
   id: number;
@@ -58,10 +84,33 @@ type PlayResponse = {
   logo_url?: string;
 };
 
+type MediaItem = {
+  content_id?: string;
+  MediaID?: string;
+  media_id?: string;
+  media_file_id?: number;
+  playable?: boolean;
+  type?: string;
+  MediaType?: string;
+  media_type?: string;
+  Title?: string;
+  title?: string;
+  Year?: number;
+  year?: number;
+  Overview?: string;
+  overview?: string;
+  PosterURL?: string;
+  poster_url?: string;
+  RuntimeMinutes?: number;
+  runtime_minutes?: number;
+  ContentRating?: string;
+  content_rating?: string;
+};
+
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${mountPath()}${path}`, {
     ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+    headers: { "Content-Type": "application/json", ...authHeaders(), ...(init?.headers ?? {}) },
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -83,6 +132,14 @@ function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [created, setCreated] = useState<CreateResponse | null>(null);
+  const [mediaQuery, setMediaQuery] = useState("");
+  const [mediaType, setMediaType] = useState("all");
+  const [mediaResults, setMediaResults] = useState<MediaItem[]>([]);
+  const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
+  const [resolvingMediaId, setResolvingMediaId] = useState("");
+  const [mediaLoading, setMediaLoading] = useState(false);
+  const [mediaError, setMediaError] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [form, setForm] = useState({
     title: "",
     target_type: "movie",
@@ -129,13 +186,60 @@ function AdminPage() {
     void load();
   }, []);
 
+  useEffect(() => {
+    const query = mediaQuery.trim();
+    if (query.length < 2) {
+      setMediaResults([]);
+      setMediaLoading(false);
+      setMediaError("");
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setMediaLoading(true);
+      setMediaError("");
+      const params = new URLSearchParams({ q: query, limit: "20" });
+      if (mediaType !== "all") {
+        params.set("type", mediaType);
+      }
+      api<{ items?: MediaItem[] }>(`/api/admin/catalog/search?${params.toString()}`, { signal: controller.signal })
+        .then((data) => setMediaResults(data.items ?? []))
+        .catch((err) => {
+          if (err instanceof DOMException && err.name === "AbortError") return;
+          setMediaError(err instanceof Error ? err.message : "Media search failed");
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) {
+            setMediaLoading(false);
+          }
+        });
+    }, 250);
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [mediaQuery, mediaType]);
+
   async function createPass(event: React.FormEvent) {
     event.preventDefault();
     setError("");
+    if (!selectedMedia) {
+      setError("Select a media item before creating a guest pass.");
+      return;
+    }
+    if (mediaFileID(selectedMedia) <= 0) {
+      setError("Selected media does not have a playable file.");
+      return;
+    }
     try {
       const data = await api<CreateResponse>("/api/admin/passes", {
         method: "POST",
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...form,
+          title: form.title.trim() || mediaTitle(selectedMedia),
+          target_type: "media_file",
+          target_id: String(mediaFileID(selectedMedia)),
+        }),
       });
       setCreated(data);
       await load();
@@ -154,12 +258,25 @@ function AdminPage() {
     }
   }
 
+  async function selectMedia(item: MediaItem) {
+    if (mediaFileID(item) <= 0) {
+      setMediaError("Selected media does not have a playable file.");
+      return;
+    }
+    setResolvingMediaId(mediaID(item));
+    setMediaError("");
+    setSelectedMedia(item);
+    setForm({ ...form, title: form.title || mediaTitle(item) });
+    setResolvingMediaId("");
+  }
+
   return (
     <main className="app-shell">
       <header className="topbar">
         <div>
-          <p className="eyebrow">Continuum</p>
+          <p className="eyebrow">Plugin administration</p>
           <h1>Guest Passes</h1>
+          <p className="subhead">Issue temporary media access links and monitor pass usage.</p>
         </div>
         <button className="icon-button" onClick={load} type="button" aria-label="Refresh">
           <RefreshCcw size={18} />
@@ -179,51 +296,76 @@ function AdminPage() {
 
       <section className="grid">
         <form className="panel" onSubmit={createPass}>
-          <h2>Create Pass</h2>
-          <label>
-            Title
-            <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
-          </label>
-          <div className="split">
-            <label>
-              Target type
-              <select
-                value={form.target_type}
-                onChange={(e) => setForm({ ...form, target_type: e.target.value })}
-              >
-                <option value="movie">Movie</option>
-                <option value="media_file">Media file</option>
-                <option value="episode">Episode</option>
-                <option value="series">Series</option>
-                <option value="collection">Collection</option>
-                <option value="watch_room">Watch room</option>
-                <option value="ebook">Ebook</option>
-                <option value="audiobook">Audiobook</option>
-              </select>
+          <div className="panel-heading">
+            <div>
+              <h2>Configuration</h2>
+              <p className="panel-subtitle">Define the target, expiration, playback limits, and access controls.</p>
+            </div>
+            <span className="badge">New pass</span>
+          </div>
+          <div className="form-section">
+            <div className="media-picker wide-field">
+              <div className="media-search-row">
+                <label>
+                  Search media
+                  <div className="search-input">
+                    <Search size={16} />
+                    <input value={mediaQuery} onChange={(e) => setMediaQuery(e.target.value)} placeholder="Title, episode, collection..." />
+                  </div>
+                </label>
+                <label>
+                  Type
+                  <select value={mediaType} onChange={(e) => setMediaType(e.target.value)}>
+                    <option value="all">All</option>
+                    <option value="movie">Movies</option>
+                    <option value="episode">Episodes</option>
+                  </select>
+                </label>
+              </div>
+              {selectedMedia && (
+                <div className="selected-media">
+                  <MediaThumb item={selectedMedia} />
+                  <div>
+                    <strong>{mediaTitle(selectedMedia)}</strong>
+                    <span>{mediaMeta(selectedMedia)}</span>
+                  </div>
+                </div>
+              )}
+              {mediaError && <p className="field-error">{mediaError}</p>}
+              {mediaLoading && <p className="muted">Searching...</p>}
+              {!mediaLoading && mediaQuery.trim().length >= 2 && mediaResults.length === 0 && !mediaError ? <p className="muted">No matches.</p> : null}
+              {mediaResults.length > 0 && (
+                <div className="media-results">
+                  {mediaResults.map((item) => (
+                    <button
+                      className={selectedMedia && mediaID(selectedMedia) === mediaID(item) ? "media-result selected" : "media-result"}
+                      disabled={resolvingMediaId === mediaID(item)}
+                      key={`${mediaTargetType(item)}:${mediaID(item)}`}
+                      onClick={() => void selectMedia(item)}
+                      type="button"
+                    >
+                      <MediaThumb item={item} />
+                      <span>
+                        <strong>{mediaTitle(item)}</strong>
+                        <small>{resolvingMediaId === mediaID(item) ? "Selecting..." : mediaMeta(item)}</small>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <label className="wide-field">
+              Pass title
+              <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder={selectedMedia ? mediaTitle(selectedMedia) : ""} />
             </label>
-            <label>
-              Target ID
-              <input value={form.target_id} onChange={(e) => setForm({ ...form, target_id: e.target.value })} required />
+            <label className="wide-field">
+              Note
+              <textarea value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} rows={3} />
             </label>
           </div>
-          <label>
-            Note
-            <textarea value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} rows={3} />
-          </label>
-          <div className="split">
+          <div className="form-section">
             <NumberField label="Expires in hours" value={form.expires_in_hours} onChange={(v) => setForm({ ...form, expires_in_hours: v })} min={1} />
-            <NumberField label="Hours after first open" value={form.valid_hours_after_first_open} onChange={(v) => setForm({ ...form, valid_hours_after_first_open: v })} min={0} />
-          </div>
-          <div className="split">
-            <NumberField label="Max opens" value={form.max_opens} onChange={(v) => setForm({ ...form, max_opens: v })} min={0} />
             <NumberField label="Max plays" value={form.max_plays} onChange={(v) => setForm({ ...form, max_plays: v })} min={0} />
-          </div>
-          <div className="split">
-            <NumberField label="Max watch minutes" value={form.max_watch_minutes} onChange={(v) => setForm({ ...form, max_watch_minutes: v })} min={0} />
-            <NumberField label="Concurrent streams" value={form.max_concurrent_streams} onChange={(v) => setForm({ ...form, max_concurrent_streams: v })} min={1} />
-          </div>
-          <div className="split">
-            <NumberField label="Max devices" value={form.max_devices} onChange={(v) => setForm({ ...form, max_devices: v })} min={1} />
             <label>
               Max resolution
               <select value={form.max_resolution} onChange={(e) => setForm({ ...form, max_resolution: e.target.value })}>
@@ -234,62 +376,84 @@ function AdminPage() {
               </select>
             </label>
           </div>
-          <div className="checkbox-grid">
-            <Checkbox label="Require PIN" checked={form.require_pin} onChange={(v) => setForm({ ...form, require_pin: v })} />
-            <Checkbox label="Lock to first IP" checked={form.lock_to_first_ip} onChange={(v) => setForm({ ...form, lock_to_first_ip: v })} />
-            <Checkbox label="Allow downloads" checked={form.allow_downloads} onChange={(v) => setForm({ ...form, allow_downloads: v })} />
-            <Checkbox label="Allow direct play" checked={form.allow_direct_play} onChange={(v) => setForm({ ...form, allow_direct_play: v })} />
-            <Checkbox label="Disable seeking" checked={form.disable_seeking} onChange={(v) => setForm({ ...form, disable_seeking: v })} />
-            <Checkbox label="Per-item play count" checked={form.per_item_play_count} onChange={(v) => setForm({ ...form, per_item_play_count: v })} />
-          </div>
-          {form.require_pin && (
-            <label>
-              PIN
-              <input value={form.pin} onChange={(e) => setForm({ ...form, pin: e.target.value })} required={form.require_pin} />
-            </label>
-          )}
-          <div className="split">
-            <NumberField label="Session grace minutes" value={form.session_grace_minutes} onChange={(v) => setForm({ ...form, session_grace_minutes: v })} min={0} />
-            <label>
-              Watermark mode
-              <select value={form.watermark_mode} onChange={(e) => setForm({ ...form, watermark_mode: e.target.value })}>
-                <option value="none">None</option>
-                <option value="visible">Visible overlay</option>
-                <option value="burned_in">Burned in</option>
-                <option value="forensic">Forensic metadata</option>
-                <option value="all">All modes</option>
-              </select>
-            </label>
-          </div>
-          <label>
-            Watermark text
-            <input value={form.watermark_profile} onChange={(e) => setForm({ ...form, watermark_profile: e.target.value })} placeholder="Guest pass {{pass_id}} · {{ip}} · {{time}}" />
-          </label>
-          <label>
-            Watermark logo URL or local path
-            <input value={form.watermark_logo_url} onChange={(e) => setForm({ ...form, watermark_logo_url: e.target.value })} placeholder="https://example.com/logo.png or /opt/continuum/logo.png" />
-          </label>
-          <label>
-            IP allowlist
-            <textarea value={form.ip_allowlist} onChange={(e) => setForm({ ...form, ip_allowlist: e.target.value })} rows={2} placeholder="One IP/CIDR per line, or comma separated" />
-          </label>
-          <div className="split">
-            <label>
-              Country allowlist
-              <input value={form.country_allowlist} onChange={(e) => setForm({ ...form, country_allowlist: e.target.value })} placeholder="US, NL" />
-            </label>
-            <label>
-              Geofence
-              <input value={form.geofence} onChange={(e) => setForm({ ...form, geofence: e.target.value })} placeholder="US, NL" />
-            </label>
-          </div>
-          <button className="primary" type="submit">
-            <Shield size={17} /> Create guest pass
+          <button className="text-button" type="button" onClick={() => setShowAdvanced((value) => !value)}>
+            {showAdvanced ? "Hide advanced options" : "Advanced options"}
           </button>
+          {showAdvanced && (
+            <>
+              <div className="form-section">
+                <NumberField label="Hours after first open" value={form.valid_hours_after_first_open} onChange={(v) => setForm({ ...form, valid_hours_after_first_open: v })} min={0} />
+                <NumberField label="Max opens" value={form.max_opens} onChange={(v) => setForm({ ...form, max_opens: v })} min={0} />
+                <NumberField label="Max watch minutes" value={form.max_watch_minutes} onChange={(v) => setForm({ ...form, max_watch_minutes: v })} min={0} />
+                <NumberField label="Concurrent streams" value={form.max_concurrent_streams} onChange={(v) => setForm({ ...form, max_concurrent_streams: v })} min={1} />
+                <NumberField label="Max devices" value={form.max_devices} onChange={(v) => setForm({ ...form, max_devices: v })} min={1} />
+                <NumberField label="Session grace minutes" value={form.session_grace_minutes} onChange={(v) => setForm({ ...form, session_grace_minutes: v })} min={0} />
+              </div>
+              <div className="checkbox-grid">
+                <Checkbox label="Require PIN" checked={form.require_pin} onChange={(v) => setForm({ ...form, require_pin: v })} />
+                <Checkbox label="Lock to first IP" checked={form.lock_to_first_ip} onChange={(v) => setForm({ ...form, lock_to_first_ip: v })} />
+                <Checkbox label="Allow downloads" checked={form.allow_downloads} onChange={(v) => setForm({ ...form, allow_downloads: v })} />
+                <Checkbox label="Allow direct play" checked={form.allow_direct_play} onChange={(v) => setForm({ ...form, allow_direct_play: v })} />
+                <Checkbox label="Disable seeking" checked={form.disable_seeking} onChange={(v) => setForm({ ...form, disable_seeking: v })} />
+                <Checkbox label="Per-item play count" checked={form.per_item_play_count} onChange={(v) => setForm({ ...form, per_item_play_count: v })} />
+              </div>
+              {form.require_pin && (
+                <label>
+                  PIN
+                  <input value={form.pin} onChange={(e) => setForm({ ...form, pin: e.target.value })} required={form.require_pin} />
+                </label>
+              )}
+              <div className="form-section">
+                <label>
+                  Watermark mode
+                  <select value={form.watermark_mode} onChange={(e) => setForm({ ...form, watermark_mode: e.target.value })}>
+                    <option value="none">None</option>
+                    <option value="visible">Visible overlay</option>
+                    <option value="burned_in">Burned in</option>
+                    <option value="forensic">Forensic metadata</option>
+                    <option value="all">All modes</option>
+                  </select>
+                </label>
+                <label className="wide-field">
+                  Watermark text
+                  <input value={form.watermark_profile} onChange={(e) => setForm({ ...form, watermark_profile: e.target.value })} placeholder="Guest pass {{pass_id}} · {{ip}} · {{time}}" />
+                </label>
+                <label className="wide-field">
+                  Watermark logo URL or local path
+                  <input value={form.watermark_logo_url} onChange={(e) => setForm({ ...form, watermark_logo_url: e.target.value })} placeholder="https://example.com/logo.png or /opt/continuum/logo.png" />
+                </label>
+                <label className="wide-field">
+                  IP allowlist
+                  <textarea value={form.ip_allowlist} onChange={(e) => setForm({ ...form, ip_allowlist: e.target.value })} rows={2} placeholder="One IP/CIDR per line, or comma separated" />
+                </label>
+                <label>
+                  Country allowlist
+                  <input value={form.country_allowlist} onChange={(e) => setForm({ ...form, country_allowlist: e.target.value })} placeholder="US, NL" />
+                </label>
+                <label>
+                  Geofence
+                  <input value={form.geofence} onChange={(e) => setForm({ ...form, geofence: e.target.value })} placeholder="US, NL" />
+                </label>
+              </div>
+            </>
+          )}
+          <div className="form-actions">
+            <button className="primary" type="submit">
+              <Shield size={17} /> Create guest pass
+            </button>
+          </div>
         </form>
 
         <section className="panel pass-list">
-          <h2>Recent Passes</h2>
+          <div className="panel-heading">
+            <h2>Recent Passes</h2>
+            <span className="badge">{passes.length} total</span>
+          </div>
+          <div className="metric-strip">
+            <Metric label="Active" value={String(passes.filter((pass) => pass.status === "active").length)} />
+            <Metric label="Revoked" value={String(passes.filter((pass) => pass.revoked_at || pass.status === "revoked").length)} />
+            <Metric label="Opened" value={String(passes.reduce((sum, pass) => sum + pass.open_count, 0))} />
+          </div>
           {loading ? <p className="muted">Loading...</p> : null}
           {!loading && passes.length === 0 ? <p className="muted">No passes yet.</p> : null}
           {passes.map((pass) => (
@@ -445,12 +609,66 @@ function NumberField({ label, value, onChange, min }: { label: string; value: nu
   );
 }
 
+function MediaThumb({ item }: { item: MediaItem }) {
+  const poster = mediaPoster(item);
+  if (poster) {
+    return <img className="media-thumb" src={poster} alt="" />;
+  }
+  return <span className="media-thumb media-thumb-fallback">{mediaTitle(item).slice(0, 1).toUpperCase()}</span>;
+}
+
+function mediaID(item: MediaItem) {
+  return item.content_id || item.media_id || item.MediaID || "";
+}
+
+function mediaFileID(item: MediaItem) {
+  return item.media_file_id ?? 0;
+}
+
+function mediaTargetType(item: MediaItem) {
+  const raw = (item.type || item.media_type || item.MediaType || "movie").toLowerCase();
+  if (raw === "tv") return "series";
+  return raw;
+}
+
+function mediaTitle(item: MediaItem) {
+  return item.title || item.Title || "Untitled media";
+}
+
+function mediaPoster(item: MediaItem) {
+  return item.poster_url || item.PosterURL || "";
+}
+
+function mediaMeta(item: MediaItem) {
+  const parts = [mediaTargetType(item)];
+  const year = item.year ?? item.Year;
+  const runtime = item.runtime_minutes ?? item.RuntimeMinutes;
+  const rating = item.content_rating || item.ContentRating;
+  if (year) parts.push(String(year));
+  if (runtime) parts.push(`${runtime} min`);
+  if (rating) parts.push(rating);
+  const id = mediaID(item);
+  if (id) parts.push(id);
+  const fileID = mediaFileID(item);
+  if (fileID) parts.push(`file ${fileID}`);
+  return parts.join(" · ");
+}
+
 function Checkbox({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
   return (
     <label className="check">
       <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
       {label}
     </label>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="metric-card">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
   );
 }
 
