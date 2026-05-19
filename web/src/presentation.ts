@@ -37,6 +37,6 @@ export function buildGuestFacts(pass: {
   ];
 }
 
-function formatShortDate(value: string): string {
+export function formatShortDate(value: string): string {
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }

@@ -30,6 +30,17 @@ describe("buildPassRowTags", () => {
       }),
     ).toEqual(["PIN", "IP lock"]);
   });
+
+  it("includes download and direct play tags when enabled", () => {
+    expect(
+      buildPassRowTags({
+        require_pin: false,
+        lock_to_first_ip: false,
+        allow_downloads: true,
+        allow_direct_play: true,
+      }),
+    ).toEqual(["Downloads", "Direct play"]);
+  });
 });
 
 describe("formatUsageStat", () => {

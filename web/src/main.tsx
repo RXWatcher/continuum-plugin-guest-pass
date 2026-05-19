@@ -8,6 +8,7 @@ import {
   buildPassRowMeta,
   buildPassRowTags,
   formatUsageStat,
+  formatShortDate,
 } from "./presentation";
 import "./styles.css";
 
@@ -621,7 +622,6 @@ function AdminPage() {
                   <span>{pass.status}</span>
                   <span>{formatUsageStat("Opens", pass.open_count, pass.max_opens)}</span>
                   <span>{formatUsageStat("Plays", pass.play_count, pass.max_plays)}</span>
-                  <span>{pass.max_resolution}</span>
                   {buildPassRowTags(pass).map((tag) => <span key={tag}>{tag}</span>)}
                 </div>
               </div>
@@ -847,7 +847,7 @@ function Metric({ label, value }: { label: string; value: string }) {
 }
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  return formatShortDate(value);
 }
 
 function absoluteURL(url: string) {
