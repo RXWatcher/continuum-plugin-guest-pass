@@ -32,7 +32,7 @@ export function buildGuestFacts(pass: {
   return [
     ["Resolution", pass.max_resolution],
     ["Devices", pass.max_devices > 0 ? String(pass.max_devices) : "∞"],
-    ["Watch time", `${pass.max_watch_minutes > 0 ? pass.max_watch_minutes : "∞"} min`],
+    ["Watch time", pass.max_watch_minutes > 0 ? `${pass.max_watch_minutes} min` : "∞ min"],
     ["Play limit", pass.max_plays > 0 ? String(pass.max_plays) : "∞"],
   ];
 }

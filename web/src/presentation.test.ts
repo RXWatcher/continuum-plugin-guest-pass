@@ -65,4 +65,20 @@ describe("buildGuestFacts", () => {
       ["Play limit", "1"],
     ]);
   });
+
+  it("formats unlimited guest facts cleanly", () => {
+    expect(
+      buildGuestFacts({
+        max_resolution: "1080p",
+        max_devices: 0,
+        max_watch_minutes: 0,
+        max_plays: 0,
+      }),
+    ).toEqual([
+      ["Resolution", "1080p"],
+      ["Devices", "∞"],
+      ["Watch time", "∞ min"],
+      ["Play limit", "∞"],
+    ]);
+  });
 });

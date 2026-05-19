@@ -694,7 +694,23 @@ function GuestPassPage() {
       }
     }
     void openPass();
-  }, [token]);
+  }, [deviceId, token]);
+
+  async function unlockPass(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    try {
+      const data = await api<{ pass: Pass }>(`/api/public/passes/${token}/open`, {
+        method: "POST",
+        body: JSON.stringify({ pin, device_id: deviceId }),
+      });
+      setPass(data.pass);
+      setStatus(data.pass.status);
+      setNeedsPin(false);
+      setMessage("");
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Invalid PIN");
+    }
+  }
 
   async function play() {
     try {
@@ -703,6 +719,7 @@ function GuestPassPage() {
         body: JSON.stringify({ pin, device_id: deviceId }),
       });
       setPass(data.pass);
+      setStatus(data.pass.status);
       if (data.stream_url) {
         setPlayback(data);
         return;
@@ -716,63 +733,76 @@ function GuestPassPage() {
   return (
     <main className="guest-shell">
       <section className="guest-panel">
-        <p className="eyebrow">Continuum Guest Pass</p>
-        <h1>{pass?.title ?? "Guest Pass"}</h1>
-        {playback?.stream_url ? (
-          <div className="player-shell">
-            <video controls autoPlay src={new URL(playback.stream_url, window.location.origin).toString()} />
-            {visibleWatermark(playback.pass.watermark_mode) && (
-              <>
-                {playback.logo_url && <img className="watermark-logo" src={playback.logo_url} alt="" />}
-                {playback.watermark && <div className="watermark-text">{playback.watermark}</div>}
-              </>
-            )}
+        <div className="guest-hero">
+          {pass && <MediaThumb item={{ title: pass.title, poster_url: playback?.logo_url ?? "" }} />}
+          <div className="guest-copy">
+            <p className="eyebrow">Continuum guest pass</p>
+            <h1>{pass?.title ?? "Guest Pass"}</h1>
+            {pass?.note && <p className="guest-note">{pass.note}</p>}
+            {pass && <p className="guest-expiry">Available until {formatDate(pass.effective_expires_at)}</p>}
           </div>
-        ) : pass ? (
+        </div>
+
+        {status === "loading" && <GuestLoadingState />}
+
+        {needsPin && pass && (
+          <form className="pin-panel" onSubmit={unlockPass}>
+            <label>
+              Access PIN
+              <input value={pin} onChange={(event) => setPin(event.target.value)} autoFocus />
+            </label>
+            <button className="primary" type="submit">Unlock pass</button>
+          </form>
+        )}
+
+        {pass && !playback?.stream_url && !needsPin && (
           <>
-            {needsPin && (
-              <form className="pin-row" onSubmit={(event) => {
-                event.preventDefault();
-                api<{ pass: Pass }>(`/api/public/passes/${token}/open`, {
-                  method: "POST",
-                  body: JSON.stringify({ pin, device_id: deviceId }),
-                }).then((data) => {
-                  setPass(data.pass);
-                  setStatus(data.pass.status);
-                  setNeedsPin(false);
-                  setMessage("");
-                }).catch((err) => setMessage(err instanceof Error ? err.message : "Invalid PIN"));
-              }}>
-                <label>
-                  PIN
-                  <input value={pin} onChange={(event) => setPin(event.target.value)} autoFocus />
-                </label>
-                <button className="primary" type="submit">Unlock</button>
-              </form>
-            )}
-            <dl className="details">
-              <dt>Status</dt><dd>{status}</dd>
-              <dt>Target</dt><dd>{pass.target_type}:{pass.target_id}</dd>
-              <dt>Expires</dt><dd>{formatDate(pass.effective_expires_at)}</dd>
+            <dl className="guest-facts">
               {buildGuestFacts(pass).map(([label, value]) => (
-                <React.Fragment key={label}>
+                <div key={label}>
                   <dt>{label}</dt>
                   <dd>{value}</dd>
-                </React.Fragment>
+                </div>
               ))}
             </dl>
-            {pass.note && <p className="note">{pass.note}</p>}
-            <button className="primary" type="button" onClick={play} disabled={pass.status !== "active" || needsPin}>
-              <ExternalLink size={17} /> Start playback
+            <button className="primary guest-cta" type="button" onClick={play} disabled={pass.status !== "active"}>
+              <ExternalLink size={17} />
+              <span>Start playback</span>
             </button>
           </>
-        ) : (
-          <p className="muted">{message || "Opening pass..."}</p>
         )}
+
+        {playback?.stream_url && pass && (
+          <section className="playback-stage">
+            <div className="player-shell">
+              <video controls autoPlay src={new URL(playback.stream_url, window.location.origin).toString()} />
+              {visibleWatermark(playback.pass.watermark_mode) && (
+                <>
+                  {playback.logo_url && <img className="watermark-logo" src={playback.logo_url} alt="" />}
+                  {playback.watermark && <div className="watermark-text">{playback.watermark}</div>}
+                </>
+              )}
+            </div>
+            <dl className="guest-facts guest-facts-compact">
+              {buildGuestFacts(pass).map(([label, value]) => (
+                <div key={label}>
+                  <dt>{label}</dt>
+                  <dd>{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        )}
+
+        {!pass && status !== "loading" && <p className="muted">{message || "This guest pass is unavailable."}</p>}
         {message && <div className="alert">{message}</div>}
       </section>
     </main>
   );
+}
+
+function GuestLoadingState() {
+  return <p className="muted">Opening pass...</p>;
 }
 
 function NumberField({ label, value, onChange, min }: { label: string; value: number; onChange: (value: number) => void; min: number }) {
