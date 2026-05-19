@@ -3,6 +3,12 @@ import { createRoot } from "react-dom/client";
 import { Activity, ArrowLeft, Copy, ExternalLink, Printer, RefreshCcw, Search, Shield, Trash2 } from "lucide-react";
 import { mountPath } from "./mountPath";
 import { buildPolicySummary, duplicatePassForm, eventTone, passTemplates } from "./passTools";
+import {
+  buildGuestFacts,
+  buildPassRowMeta,
+  buildPassRowTags,
+  formatUsageStat,
+} from "./presentation";
 import "./styles.css";
 
 let cachedToken = "";
@@ -610,14 +616,13 @@ function AdminPage() {
             <article className="pass-row" key={pass.id}>
               <div>
                 <div className="row-title">{pass.title}</div>
-                <div className="muted">{pass.target_type}:{pass.target_id}</div>
+                <div className="muted">{buildPassRowMeta(pass).join(" · ")}</div>
                 <div className="metrics">
                   <span>{pass.status}</span>
-                  <span>{pass.open_count}/{limit(pass.max_opens)} opens</span>
-                  <span>{pass.play_count}/{limit(pass.max_plays)} plays</span>
+                  <span>{formatUsageStat("Opens", pass.open_count, pass.max_opens)}</span>
+                  <span>{formatUsageStat("Plays", pass.play_count, pass.max_plays)}</span>
                   <span>{pass.max_resolution}</span>
-                  {pass.require_pin && <span>PIN</span>}
-                  {pass.lock_to_first_ip && <span>IP lock</span>}
+                  {buildPassRowTags(pass).map((tag) => <span key={tag}>{tag}</span>)}
                 </div>
               </div>
               <div className="row-actions">
@@ -748,11 +753,12 @@ function GuestPassPage() {
               <dt>Status</dt><dd>{status}</dd>
               <dt>Target</dt><dd>{pass.target_type}:{pass.target_id}</dd>
               <dt>Expires</dt><dd>{formatDate(pass.effective_expires_at)}</dd>
-              <dt>Opens</dt><dd>{pass.open_count}/{limit(pass.max_opens)}</dd>
-              <dt>Plays</dt><dd>{pass.play_count}/{limit(pass.max_plays)}</dd>
-              <dt>Resolution</dt><dd>{pass.max_resolution}</dd>
-              <dt>Devices</dt><dd>{limit(pass.max_devices)}</dd>
-              <dt>Watch time</dt><dd>{limit(pass.max_watch_minutes)} min</dd>
+              {buildGuestFacts(pass).map(([label, value]) => (
+                <React.Fragment key={label}>
+                  <dt>{label}</dt>
+                  <dd>{value}</dd>
+                </React.Fragment>
+              ))}
             </dl>
             {pass.note && <p className="note">{pass.note}</p>}
             <button className="primary" type="button" onClick={play} disabled={pass.status !== "active" || needsPin}>
@@ -838,10 +844,6 @@ function Metric({ label, value }: { label: string; value: string }) {
       <strong>{value}</strong>
     </div>
   );
-}
-
-function limit(value: number) {
-  return value > 0 ? String(value) : "∞";
 }
 
 function formatDate(value: string) {
