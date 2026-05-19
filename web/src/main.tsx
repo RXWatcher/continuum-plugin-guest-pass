@@ -729,6 +729,7 @@ function GuestPassPage() {
         });
         setPass(data.pass);
         setStatus(data.pass.status);
+        setMessage("");
       } catch (err) {
         setStatus("unavailable");
         setMessage(guestFacingErrorMessage(err, "This guest pass is unavailable."));
@@ -761,6 +762,7 @@ function GuestPassPage() {
       });
       setPass(data.pass);
       setStatus(data.pass.status);
+      setMessage("");
       if (data.stream_url) {
         setPlayback(data);
         return;
@@ -835,8 +837,8 @@ function GuestPassPage() {
           </section>
         )}
 
-        {!pass && status !== "loading" && <p className="empty-block">{message || "This guest pass is unavailable."}</p>}
-        {message && <div className="alert">{message}</div>}
+        {!pass && status !== "loading" ? <p className="empty-block">{message || "This guest pass is unavailable."}</p> : null}
+        {pass && message ? <div className="alert">{message}</div> : null}
       </section>
     </main>
   );
