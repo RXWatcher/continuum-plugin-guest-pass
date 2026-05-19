@@ -9,6 +9,7 @@ import {
   buildPassRowTags,
   formatUsageStat,
   formatShortDate,
+  guestPassStatusMessage,
 } from "./presentation";
 import "./styles.css";
 
@@ -130,6 +131,12 @@ type MediaItem = {
   content_rating?: string;
 };
 
+type APIError = Error & {
+  responseStatus?: number;
+  responseCode?: string;
+  responseGuestStatus?: string;
+};
+
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${mountPath()}${path}`, {
     ...init,
@@ -138,7 +145,11 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const message = data?.error?.message || data?.message || `Request failed (${res.status})`;
-    throw new Error(message);
+    const error = new Error(message) as APIError;
+    error.responseStatus = res.status;
+    error.responseCode = data?.error?.code;
+    error.responseGuestStatus = data?.status;
+    throw error;
   }
   return data as T;
 }
@@ -720,7 +731,7 @@ function GuestPassPage() {
         setStatus(data.pass.status);
       } catch (err) {
         setStatus("unavailable");
-        setMessage(err instanceof Error ? err.message : "This guest pass is unavailable.");
+        setMessage(guestFacingErrorMessage(err, "This guest pass is unavailable."));
       }
     }
     void openPass();
@@ -738,7 +749,7 @@ function GuestPassPage() {
       setNeedsPin(false);
       setMessage("");
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Invalid PIN");
+      setMessage(guestFacingErrorMessage(err, "Enter the access PIN to continue."));
     }
   }
 
@@ -756,7 +767,7 @@ function GuestPassPage() {
       }
       setMessage(data.message || "Playback is not available.");
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Playback is not available.");
+      setMessage(guestFacingErrorMessage(err, "Playback is not available."));
     }
   }
 
@@ -838,6 +849,13 @@ function GuestLoadingState() {
       <div className="skeleton-row" />
     </div>
   );
+}
+
+function guestFacingErrorMessage(err: unknown, fallback: string): string {
+  const status = typeof err === "object" && err && "responseGuestStatus" in err ? (err as APIError).responseGuestStatus : undefined;
+  const guestMessage = typeof status === "string" ? guestPassStatusMessage(status) : null;
+  if (guestMessage) return guestMessage;
+  return err instanceof Error ? err.message : fallback;
 }
 
 function NumberField({ label, value, onChange, min }: { label: string; value: number; onChange: (value: number) => void; min: number }) {

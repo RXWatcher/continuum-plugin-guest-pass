@@ -4,18 +4,33 @@ import {
   buildPassRowMeta,
   buildPassRowTags,
   formatUsageStat,
+  formatPassTargetContext,
+  guestPassStatusMessage,
 } from "./presentation";
 
 describe("buildPassRowMeta", () => {
-  it("prefers readable expiry text over raw target ids", () => {
+  it("includes compact target context alongside expiry and resolution", () => {
     const meta = buildPassRowMeta({
+      target_type: "media_file",
+      target_id: "42",
       effective_expires_at: "2026-05-20T12:00:00Z",
       max_resolution: "1080p",
     });
 
-    expect(meta).toHaveLength(2);
-    expect(meta[0]).toContain("Expires ");
-    expect(meta[1]).toBe("1080p");
+    expect(meta).toHaveLength(3);
+    expect(meta[0]).toBe("File #42");
+    expect(meta[1]).toContain("Expires ");
+    expect(meta[2]).toBe("1080p");
+  });
+});
+
+describe("formatPassTargetContext", () => {
+  it("humanizes media file targets", () => {
+    expect(formatPassTargetContext("media_file", "84")).toBe("File #84");
+  });
+
+  it("falls back to title-cased target labels for unknown target types", () => {
+    expect(formatPassTargetContext("screening_room", "west-wing")).toBe("Screening room #west-wing");
   });
 });
 
@@ -80,5 +95,25 @@ describe("buildGuestFacts", () => {
       ["Watch time", "∞ min"],
       ["Play limit", "∞"],
     ]);
+  });
+});
+
+describe("guestPassStatusMessage", () => {
+  it("maps public-route statuses to human-readable guest copy", () => {
+    expect(guestPassStatusMessage("expired")).toBe("This guest pass has expired.");
+    expect(guestPassStatusMessage("revoked")).toBe("This guest pass has been revoked.");
+    expect(guestPassStatusMessage("device_limit_reached")).toBe("This guest pass has reached its device limit.");
+    expect(guestPassStatusMessage("open_limit_reached")).toBe("This guest pass has reached its open limit.");
+    expect(guestPassStatusMessage("play_limit_reached")).toBe("This guest pass has reached its play limit.");
+    expect(guestPassStatusMessage("concurrent_stream_limit_reached")).toBe("Too many viewers are using this guest pass right now. Try again shortly.");
+    expect(guestPassStatusMessage("ip_locked")).toBe("This guest pass is locked to the network where it was first opened.");
+    expect(guestPassStatusMessage("ip_not_allowed")).toBe("This guest pass is not available from your network.");
+    expect(guestPassStatusMessage("country_not_allowed")).toBe("This guest pass is not available in your region.");
+    expect(guestPassStatusMessage("pin_required")).toBe("Enter the access PIN to continue.");
+    expect(guestPassStatusMessage("not_found")).toBe("This guest pass could not be found.");
+  });
+
+  it("returns null for unknown statuses so callers can keep their fallback copy", () => {
+    expect(guestPassStatusMessage("unexpected_status")).toBeNull();
   });
 });
