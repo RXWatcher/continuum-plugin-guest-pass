@@ -8,14 +8,14 @@ import {
 
 describe("buildPassRowMeta", () => {
   it("prefers readable expiry text over raw target ids", () => {
-    expect(
-      buildPassRowMeta({
-        effective_expires_at: "2026-05-20T12:00:00Z",
-        max_resolution: "1080p",
-        target_type: "media_file",
-        target_id: "42",
-      }),
-    ).toContain("Expires");
+    const meta = buildPassRowMeta({
+      effective_expires_at: "2026-05-20T12:00:00Z",
+      max_resolution: "1080p",
+    });
+
+    expect(meta).toHaveLength(2);
+    expect(meta[0]).toContain("Expires ");
+    expect(meta[1]).toBe("1080p");
   });
 });
 

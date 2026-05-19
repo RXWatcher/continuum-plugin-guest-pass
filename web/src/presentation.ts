@@ -5,10 +5,8 @@ export function formatUsageStat(label: string, current: number, limit: number): 
 export function buildPassRowMeta(pass: {
   effective_expires_at: string;
   max_resolution: string;
-  target_type: string;
-  target_id: string;
 }): string[] {
-  return ["Expires", formatShortDate(pass.effective_expires_at), pass.max_resolution];
+  return [`Expires ${formatShortDate(pass.effective_expires_at)}`, pass.max_resolution];
 }
 
 export function buildPassRowTags(pass: {
