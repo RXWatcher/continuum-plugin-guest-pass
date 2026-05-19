@@ -434,8 +434,18 @@ function AdminPage() {
                   </div>
                 )}
                 {mediaError && <p className="field-error">{mediaError}</p>}
-                {mediaLoading && <p className="muted">Searching...</p>}
-                {!mediaLoading && mediaQuery.trim().length >= 2 && mediaResults.length === 0 && !mediaError ? <p className="muted">No matches.</p> : null}
+                {mediaLoading ? (
+                  <div className="loading-block" role="status" aria-live="polite" aria-busy="true">
+                    <span className="sr-only">Searching media catalog.</span>
+                    <div className="skeleton-row" />
+                  </div>
+                ) : null}
+                {!mediaLoading && mediaQuery.trim().length >= 2 && mediaResults.length === 0 && !mediaError ? (
+                  <div className="empty-block">
+                    <strong>No matches found.</strong>
+                    <p>Try a broader title or switch media type.</p>
+                  </div>
+                ) : null}
                 {mediaResults.length > 0 && (
                   <div className="media-results">
                     {mediaResults.map((item) => (
@@ -607,7 +617,12 @@ function AdminPage() {
                 <div className="skeleton-row" />
               </div>
             ) : null}
-            {!loading && passes.length === 0 ? <p className="empty-block">No passes yet.</p> : null}
+            {!loading && passes.length === 0 ? (
+              <div className="empty-block">
+                <strong>No passes yet.</strong>
+                <p>Create a pass to start sharing.</p>
+              </div>
+            ) : null}
             {passes.map((pass) => (
               <article className="pass-row" key={pass.id}>
                 <div className="pass-row-copy">
@@ -648,8 +663,18 @@ function AdminPage() {
                 </div>
                 {activeEventsPassID === pass.id && (
                   <div className="event-timeline">
-                    {eventLoading === pass.id ? <p className="muted">Loading activity...</p> : null}
-                    {eventLoading !== pass.id && (eventsByPass[pass.id]?.length ?? 0) === 0 ? <p className="muted">No activity recorded.</p> : null}
+                    {eventLoading === pass.id ? (
+                      <div className="loading-block" role="status" aria-live="polite" aria-busy="true">
+                        <span className="sr-only">Loading pass activity.</span>
+                        <div className="skeleton-row" />
+                      </div>
+                    ) : null}
+                    {eventLoading !== pass.id && (eventsByPass[pass.id]?.length ?? 0) === 0 ? (
+                      <div className="empty-block">
+                        <strong>No activity recorded.</strong>
+                        <p>Open or play this pass to start an audit trail.</p>
+                      </div>
+                    ) : null}
                     {(eventsByPass[pass.id] ?? []).map((event) => (
                       <div className={`event-row ${eventTone(event.type)}`} key={event.id}>
                         <span>{event.type.replace(/_/g, " ")}</span>

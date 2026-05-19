@@ -954,10 +954,23 @@ code {
 
 .loading-block,
 .empty-block {
+  display: grid;
+  gap: 0.45rem;
   border: 1px dashed var(--border);
   border-radius: var(--radius);
   padding: 1rem;
   color: var(--muted-foreground);
+}
+
+.loading-block p,
+.empty-block p {
+  margin: 0;
+}
+
+.loading-block strong,
+.empty-block strong {
+  color: var(--foreground);
+  font-size: 14px;
 }
 
 .sr-only {
