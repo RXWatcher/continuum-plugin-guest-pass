@@ -601,8 +601,12 @@ function AdminPage() {
               <Metric label="Revoked" value={String(passes.filter((pass) => pass.revoked_at || pass.status === "revoked").length)} />
               <Metric label="Opened" value={String(passes.reduce((sum, pass) => sum + pass.open_count, 0))} />
             </div>
-            {loading ? <p className="muted">Loading...</p> : null}
-            {!loading && passes.length === 0 ? <p className="muted">No passes yet.</p> : null}
+            {loading ? (
+              <div className="loading-block" aria-label="Loading passes">
+                <div className="skeleton-row" />
+              </div>
+            ) : null}
+            {!loading && passes.length === 0 ? <p className="empty-block">No passes yet.</p> : null}
             {passes.map((pass) => (
               <article className="pass-row" key={pass.id}>
                 <div className="pass-row-copy">
@@ -734,7 +738,7 @@ function GuestPassPage() {
     <main className="guest-shell">
       <section className="guest-panel">
         <div className="guest-hero">
-          {pass && <MediaThumb item={{ title: pass.title, poster_url: playback?.logo_url ?? "" }} />}
+          {pass && <MediaThumb item={{ title: pass.title }} />}
           <div className="guest-copy">
             <p className="eyebrow">Continuum guest pass</p>
             <h1>{pass?.title ?? "Guest Pass"}</h1>
@@ -794,7 +798,7 @@ function GuestPassPage() {
           </section>
         )}
 
-        {!pass && status !== "loading" && <p className="muted">{message || "This guest pass is unavailable."}</p>}
+        {!pass && status !== "loading" && <p className="empty-block">{message || "This guest pass is unavailable."}</p>}
         {message && <div className="alert">{message}</div>}
       </section>
     </main>
@@ -802,7 +806,11 @@ function GuestPassPage() {
 }
 
 function GuestLoadingState() {
-  return <p className="muted">Opening pass...</p>;
+  return (
+    <div className="loading-block">
+      <div className="skeleton-row" aria-label="Opening pass" />
+    </div>
+  );
 }
 
 function NumberField({ label, value, onChange, min }: { label: string; value: number; onChange: (value: number) => void; min: number }) {
