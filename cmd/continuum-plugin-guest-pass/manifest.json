@@ -76,36 +76,6 @@
           }
         ]
       }
-    },
-    {
-      "key": "public_base_url",
-      "title": "Public base URL",
-      "description": "Optional absolute URL used when returning share links. Leave empty to return relative plugin URLs.",
-      "json_schema": "{\"type\":\"object\",\"properties\":{\"value\":{\"type\":\"string\"}}}",
-      "admin_form": {
-        "fields": [
-          {
-            "key": "value",
-            "label": "Public URL",
-            "control": "ADMIN_FORM_CONTROL_TEXT"
-          }
-        ]
-      }
-    },
-    {
-      "key": "audit_retention_days",
-      "title": "Audit retention days",
-      "description": "How long to retain guest-pass event rows after creation. Defaults to 180.",
-      "json_schema": "{\"type\":\"object\",\"properties\":{\"value\":{\"type\":\"integer\",\"minimum\":1}}}",
-      "admin_form": {
-        "fields": [
-          {
-            "key": "value",
-            "label": "Retention days",
-            "control": "ADMIN_FORM_CONTROL_NUMBER"
-          }
-        ]
-      }
     }
   ]
 }

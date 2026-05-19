@@ -58,13 +58,20 @@ func main() {
 			return fmt.Errorf("migrate: %w", err)
 		}
 		st := store.New(pool)
+		appCfg, err := st.ImportLegacyAppConfig(ctx, store.AppConfig{
+			PublicBaseURL:     cfg.PublicBaseURL,
+			AuditRetentionDay: cfg.AuditRetentionDay,
+		})
+		if err != nil {
+			pool.Close()
+			return fmt.Errorf("import app config: %w", err)
+		}
 		httpSrv.SetHandler(server.New(server.Deps{
-			Store:         st,
-			Logger:        logger,
-			PublicBaseURL: cfg.PublicBaseURL,
-			WebFS:         web.FSEmbed(),
+			Store:  st,
+			Logger: logger,
+			WebFS:  web.FSEmbed(),
 		}))
-		pollSrv.Set(st, poll.Config{RetentionDays: cfg.AuditRetentionDay})
+		pollSrv.Set(st, poll.Config{RetentionDays: appCfg.AuditRetentionDay})
 		if old := poolPtr.Swap(pool); old != nil {
 			old.Close()
 		}

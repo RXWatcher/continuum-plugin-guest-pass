@@ -95,6 +95,11 @@ type PlayResponse = {
   logo_url?: string;
 };
 
+type AppConfig = {
+  public_base_url: string;
+  audit_retention_days: number;
+};
+
 type MediaItem = {
   content_id?: string;
   MediaID?: string;
@@ -154,6 +159,8 @@ function AdminPage() {
   const [eventsByPass, setEventsByPass] = useState<Record<number, PassEvent[]>>({});
   const [activeEventsPassID, setActiveEventsPassID] = useState<number | null>(null);
   const [eventLoading, setEventLoading] = useState<number | null>(null);
+  const [config, setConfig] = useState<AppConfig>({ public_base_url: "", audit_retention_days: 180 });
+  const [configStatus, setConfigStatus] = useState("");
   const [form, setForm] = useState({
     title: "",
     target_type: "media_file",
@@ -190,10 +197,28 @@ function AdminPage() {
     try {
       const data = await api<{ passes: Pass[] }>("/api/admin/passes");
       setPasses(data.passes ?? []);
+      const cfg = await api<AppConfig>("/api/admin/config");
+      setConfig(cfg);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load passes");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function saveConfig(event: React.FormEvent) {
+    event.preventDefault();
+    setConfigStatus("");
+    setError("");
+    try {
+      const cfg = await api<AppConfig>("/api/admin/config", {
+        method: "PATCH",
+        body: JSON.stringify(config),
+      });
+      setConfig(cfg);
+      setConfigStatus("Settings saved.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save settings");
     }
   }
 
@@ -362,6 +387,40 @@ function AdminPage() {
       )}
 
       <section className="grid">
+        <form className="panel" onSubmit={saveConfig}>
+          <div className="panel-heading">
+            <div>
+              <h2>Plugin settings</h2>
+              <p className="panel-subtitle">Control share link generation and audit event retention.</p>
+            </div>
+          </div>
+          <div className="form-section">
+            <label>
+              Public base URL
+              <input
+                value={config.public_base_url}
+                onChange={(e) => setConfig({ ...config, public_base_url: e.target.value })}
+                placeholder="https://example.com/api/v1/plugins/guest-pass"
+              />
+            </label>
+            <label>
+              Audit retention days
+              <input
+                min={1}
+                type="number"
+                value={config.audit_retention_days}
+                onChange={(e) => setConfig({ ...config, audit_retention_days: Number(e.target.value) })}
+              />
+            </label>
+          </div>
+          <div className="form-actions">
+            <button type="submit">
+              <Shield size={16} /> Save settings
+            </button>
+            {configStatus && <span className="muted">{configStatus}</span>}
+          </div>
+        </form>
+
         <form className="panel" onSubmit={createPass}>
           <div className="panel-heading">
             <div>

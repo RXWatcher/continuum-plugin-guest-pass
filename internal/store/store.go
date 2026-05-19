@@ -26,6 +26,15 @@ type Store struct {
 	pool *pgxpool.Pool
 }
 
+type AppConfig struct {
+	PublicBaseURL     string `json:"public_base_url"`
+	AuditRetentionDay int    `json:"audit_retention_days"`
+}
+
+func DefaultAppConfig() AppConfig {
+	return AppConfig{AuditRetentionDay: 180}
+}
+
 type Pass struct {
 	ID                       int        `json:"id"`
 	TokenHash                string     `json:"-"`
@@ -212,8 +221,76 @@ CREATE TABLE IF NOT EXISTS guest_pass_grants (
 	created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS guest_pass_grants_active_idx ON guest_pass_grants (pass_id, expires_at);
+CREATE TABLE IF NOT EXISTS app_config (
+	id INTEGER PRIMARY KEY DEFAULT 1,
+	public_base_url TEXT NOT NULL DEFAULT '',
+	audit_retention_days INTEGER NOT NULL DEFAULT 180,
+	updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+	CONSTRAINT app_config_singleton CHECK (id = 1)
+);
+INSERT INTO app_config (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
 `)
 	return err
+}
+
+func (s *Store) GetAppConfig(ctx context.Context) (AppConfig, error) {
+	cfg := DefaultAppConfig()
+	err := s.pool.QueryRow(ctx, `
+		SELECT public_base_url, audit_retention_days
+		FROM app_config WHERE id = 1
+	`).Scan(&cfg.PublicBaseURL, &cfg.AuditRetentionDay)
+	if errors.Is(err, pgx.ErrNoRows) {
+		if _, err := s.pool.Exec(ctx, `INSERT INTO app_config (id) VALUES (1) ON CONFLICT (id) DO NOTHING`); err != nil {
+			return AppConfig{}, fmt.Errorf("ensure app_config: %w", err)
+		}
+		return s.GetAppConfig(ctx)
+	}
+	if err != nil {
+		return AppConfig{}, fmt.Errorf("get app_config: %w", err)
+	}
+	return normalizeAppConfig(cfg), nil
+}
+
+func (s *Store) UpdateAppConfig(ctx context.Context, cfg AppConfig) error {
+	cfg = normalizeAppConfig(cfg)
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO app_config (id, public_base_url, audit_retention_days, updated_at)
+		VALUES (1, $1, $2, NOW())
+		ON CONFLICT (id) DO UPDATE SET
+			public_base_url = EXCLUDED.public_base_url,
+			audit_retention_days = EXCLUDED.audit_retention_days,
+			updated_at = NOW()
+	`, cfg.PublicBaseURL, cfg.AuditRetentionDay)
+	if err != nil {
+		return fmt.Errorf("update app_config: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) ImportLegacyAppConfig(ctx context.Context, legacy AppConfig) (AppConfig, error) {
+	current, err := s.GetAppConfig(ctx)
+	if err != nil {
+		return AppConfig{}, err
+	}
+	if current != DefaultAppConfig() {
+		return current, nil
+	}
+	next := normalizeAppConfig(legacy)
+	if next == current {
+		return current, nil
+	}
+	if err := s.UpdateAppConfig(ctx, next); err != nil {
+		return AppConfig{}, err
+	}
+	return s.GetAppConfig(ctx)
+}
+
+func normalizeAppConfig(cfg AppConfig) AppConfig {
+	cfg.PublicBaseURL = strings.TrimRight(strings.TrimSpace(cfg.PublicBaseURL), "/")
+	if cfg.AuditRetentionDay < 1 {
+		cfg.AuditRetentionDay = 180
+	}
+	return cfg
 }
 
 func GenerateToken() (string, string, error) {

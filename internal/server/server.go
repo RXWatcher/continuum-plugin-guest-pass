@@ -11,6 +11,7 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -27,10 +28,9 @@ import (
 )
 
 type Deps struct {
-	Store         *store.Store
-	Logger        hclog.Logger
-	PublicBaseURL string
-	WebFS         fs.FS
+	Store  *store.Store
+	Logger hclog.Logger
+	WebFS  fs.FS
 }
 
 type passResponse struct {
@@ -68,6 +68,8 @@ func New(d Deps) http.Handler {
 		r.Post("/passes/{id}/revoke", hRevokePass(d))
 		r.Get("/passes/{id}/events", hListEvents(d))
 		r.Get("/catalog/search", hSearchCatalog(d))
+		r.Get("/config", hGetConfig(d))
+		r.Patch("/config", hUpdateConfig(d))
 	})
 
 	r.Route("/api/public", func(r chi.Router) {
@@ -123,7 +125,7 @@ func hListPasses(d Deps) http.HandlerFunc {
 		now := time.Now()
 		out := make([]passResponse, 0, len(passes))
 		for _, p := range passes {
-			out = append(out, decoratePass(p, "", d.PublicBaseURL, now))
+			out = append(out, decoratePass(p, "", publicBaseURL(r, d), now))
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"passes": out})
 	}
@@ -221,11 +223,61 @@ func hCreatePass(d Deps) http.HandlerFunc {
 			return
 		}
 		_ = d.Store.RecordEvent(r.Context(), p.ID, "created", clientIP(r), r.UserAgent(), nil)
+		baseURL := publicBaseURL(r, d)
 		writeJSON(w, http.StatusCreated, map[string]any{
-			"pass":      decoratePass(*p, token, d.PublicBaseURL, time.Now()),
+			"pass":      decoratePass(*p, token, baseURL, time.Now()),
 			"token":     token,
-			"share_url": shareURL(d.PublicBaseURL, token),
+			"share_url": shareURL(baseURL, token),
 		})
+	}
+}
+
+func hGetConfig(d Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		cfg, err := d.Store.GetAppConfig(r.Context())
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, "config_failed", err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, cfg)
+	}
+}
+
+func hUpdateConfig(d Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		cur, err := d.Store.GetAppConfig(r.Context())
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, "config_failed", err.Error())
+			return
+		}
+		var req struct {
+			PublicBaseURL     *string `json:"public_base_url"`
+			AuditRetentionDay *int    `json:"audit_retention_days"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeErr(w, http.StatusBadRequest, "bad_json", "invalid JSON body")
+			return
+		}
+		if req.PublicBaseURL != nil {
+			cur.PublicBaseURL = strings.TrimSpace(*req.PublicBaseURL)
+			if cur.PublicBaseURL != "" && !validAbsoluteURL(cur.PublicBaseURL) {
+				writeErr(w, http.StatusBadRequest, "bad_public_base_url", "public_base_url must be an absolute URL")
+				return
+			}
+		}
+		if req.AuditRetentionDay != nil {
+			cur.AuditRetentionDay = *req.AuditRetentionDay
+		}
+		if err := d.Store.UpdateAppConfig(r.Context(), cur); err != nil {
+			writeErr(w, http.StatusInternalServerError, "config_failed", err.Error())
+			return
+		}
+		cfg, err := d.Store.GetAppConfig(r.Context())
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, "config_failed", err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, cfg)
 	}
 }
 
@@ -342,7 +394,7 @@ func hPublicPass(d Deps, markOpen bool) http.HandlerFunc {
 				return
 			}
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"pass": decoratePass(*p, "", d.PublicBaseURL, time.Now())})
+		writeJSON(w, http.StatusOK, map[string]any{"pass": decoratePass(*p, "", publicBaseURL(r, d), time.Now())})
 	}
 }
 
@@ -409,7 +461,7 @@ func hPlayAttempt(d Deps) http.HandlerFunc {
 		})
 		writeJSON(w, http.StatusOK, map[string]any{
 			"status":      p.Status(time.Now()),
-			"pass":        decoratePass(*p, "", d.PublicBaseURL, time.Now()),
+			"pass":        decoratePass(*p, "", publicBaseURL(r, d), time.Now()),
 			"stream_url":  grant.StreamURL,
 			"play_method": grant.PlayMethod,
 			"expires_at":  grant.ExpiresAt,
@@ -417,6 +469,22 @@ func hPlayAttempt(d Deps) http.HandlerFunc {
 			"logo_url":    p.WatermarkLogoURL,
 		})
 	}
+}
+
+func publicBaseURL(r *http.Request, d Deps) string {
+	if d.Store == nil {
+		return ""
+	}
+	cfg, err := d.Store.GetAppConfig(r.Context())
+	if err != nil {
+		return ""
+	}
+	return cfg.PublicBaseURL
+}
+
+func validAbsoluteURL(raw string) bool {
+	u, err := url.Parse(raw)
+	return err == nil && u.Scheme != "" && u.Host != ""
 }
 
 func mintPlaybackGrant(r *http.Request, p *store.Pass, watermarkText string) (*runtimehost.ScopedStreamGrant, error) {
