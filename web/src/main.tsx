@@ -383,279 +383,280 @@ function AdminPage() {
       </header>
 
       {error && <div className="alert">{error}</div>}
-      {created && (
-        <div className="success">
-          <strong>Pass created.</strong>
-          <code>{absoluteURL(created.share_url)}</code>
-          <button type="button" onClick={() => void copy(absoluteURL(created.share_url))}>
-            <Copy size={16} /> Copy link
-          </button>
-        </div>
-      )}
 
-      <section className="grid">
-        <form className="panel" onSubmit={saveConfig}>
-          <div className="panel-heading">
-            <div>
-              <h2>Plugin settings</h2>
-              <p className="panel-subtitle">Control share link generation and audit event retention.</p>
-            </div>
-          </div>
-          <div className="form-section">
-            <label>
-              Public base URL
-              <input
-                value={config.public_base_url}
-                onChange={(e) => setConfig({ ...config, public_base_url: e.target.value })}
-                placeholder="https://example.com/api/v1/plugins/guest-pass"
-              />
-            </label>
-            <label>
-              Audit retention days
-              <input
-                min={1}
-                type="number"
-                value={config.audit_retention_days}
-                onChange={(e) => setConfig({ ...config, audit_retention_days: Number(e.target.value) })}
-              />
-            </label>
-          </div>
-          <div className="form-actions">
-            <button type="submit">
-              <Shield size={16} /> Save settings
-            </button>
-            {configStatus && <span className="muted">{configStatus}</span>}
-          </div>
-        </form>
-
-        <form className="panel" onSubmit={createPass}>
-          <div className="panel-heading">
-            <div>
-              <h2>Configuration</h2>
-              <p className="panel-subtitle">Define the target, expiration, playback limits, and access controls.</p>
-            </div>
-            <span className="badge">New pass</span>
-          </div>
-          <div className="template-grid" aria-label="Guest pass templates">
-            {passTemplates.map((template) => (
-              <button key={template.id} type="button" onClick={() => applyTemplate(template.id)}>
-                <span>
-                  <strong>{template.label}</strong>
-                  <small>{template.description}</small>
-                </span>
-              </button>
-            ))}
-          </div>
-          <div className="form-section">
-            <div className="media-picker wide-field">
-              <div className="media-search-row">
-                <label>
-                  Search media
-                  <div className="search-input">
-                    <Search size={16} />
-                    <input value={mediaQuery} onChange={(e) => setMediaQuery(e.target.value)} placeholder="Title, episode, collection..." />
-                  </div>
-                </label>
-                <label>
-                  Type
-                  <select value={mediaType} onChange={(e) => setMediaType(e.target.value)}>
-                    <option value="all">All</option>
-                    <option value="movie">Movies</option>
-                    <option value="episode">Episodes</option>
-                  </select>
-                </label>
-              </div>
-              {selectedMedia && (
-                <div className="selected-media">
-                  <MediaThumb item={selectedMedia} />
-                  <div>
-                    <strong>{mediaTitle(selectedMedia)}</strong>
-                    <span>{mediaMeta(selectedMedia)}</span>
-                  </div>
-                </div>
-              )}
-              {mediaError && <p className="field-error">{mediaError}</p>}
-              {mediaLoading && <p className="muted">Searching...</p>}
-              {!mediaLoading && mediaQuery.trim().length >= 2 && mediaResults.length === 0 && !mediaError ? <p className="muted">No matches.</p> : null}
-              {mediaResults.length > 0 && (
-                <div className="media-results">
-                  {mediaResults.map((item) => (
-                    <button
-                      className={selectedMedia && mediaID(selectedMedia) === mediaID(item) ? "media-result selected" : "media-result"}
-                      disabled={resolvingMediaId === mediaID(item)}
-                      key={`${mediaTargetType(item)}:${mediaID(item)}`}
-                      onClick={() => void selectMedia(item)}
-                      type="button"
-                    >
-                      <MediaThumb item={item} />
-                      <span>
-                        <strong>{mediaTitle(item)}</strong>
-                        <small>{resolvingMediaId === mediaID(item) ? "Selecting..." : mediaMeta(item)}</small>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <label className="wide-field">
-              Pass title
-              <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder={selectedMedia ? mediaTitle(selectedMedia) : ""} />
-            </label>
-            <label className="wide-field">
-              Note
-              <textarea value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} rows={3} />
-            </label>
-          </div>
-          <div className="form-section">
-            <NumberField label="Expires in hours" value={form.expires_in_hours} onChange={(v) => setForm({ ...form, expires_in_hours: v })} min={1} />
-            <NumberField label="Max plays" value={form.max_plays} onChange={(v) => setForm({ ...form, max_plays: v })} min={0} />
-            <label>
-              Max resolution
-              <select value={form.max_resolution} onChange={(e) => setForm({ ...form, max_resolution: e.target.value })}>
-                <option value="480p">480p</option>
-                <option value="720p">720p</option>
-                <option value="1080p">1080p</option>
-                <option value="4k">4K</option>
-              </select>
-            </label>
-          </div>
-          <div className="policy-preview">
-            <div>
-              <strong>Policy preview</strong>
-              <span>{selectedMedia ? mediaTitle(selectedMedia) : "Select media to complete the pass."}</span>
-            </div>
-            <ul>
-              {policySummary.map((item) => <li key={item}>{item}</li>)}
-            </ul>
-          </div>
-          <button className="text-button" type="button" onClick={() => setShowAdvanced((value) => !value)}>
-            {showAdvanced ? "Hide advanced options" : "Advanced options"}
-          </button>
-          {showAdvanced && (
-            <>
-              <div className="form-section">
-                <NumberField label="Hours after first open" value={form.valid_hours_after_first_open} onChange={(v) => setForm({ ...form, valid_hours_after_first_open: v })} min={0} />
-                <NumberField label="Max opens" value={form.max_opens} onChange={(v) => setForm({ ...form, max_opens: v })} min={0} />
-                <NumberField label="Max watch minutes" value={form.max_watch_minutes} onChange={(v) => setForm({ ...form, max_watch_minutes: v })} min={0} />
-                <NumberField label="Concurrent streams" value={form.max_concurrent_streams} onChange={(v) => setForm({ ...form, max_concurrent_streams: v })} min={1} />
-                <NumberField label="Max devices" value={form.max_devices} onChange={(v) => setForm({ ...form, max_devices: v })} min={1} />
-                <NumberField label="Session grace minutes" value={form.session_grace_minutes} onChange={(v) => setForm({ ...form, session_grace_minutes: v })} min={0} />
-              </div>
-              <div className="checkbox-grid">
-                <Checkbox label="Require PIN" checked={form.require_pin} onChange={(v) => setForm({ ...form, require_pin: v })} />
-                <Checkbox label="Lock to first IP" checked={form.lock_to_first_ip} onChange={(v) => setForm({ ...form, lock_to_first_ip: v })} />
-                <Checkbox label="Allow downloads" checked={form.allow_downloads} onChange={(v) => setForm({ ...form, allow_downloads: v })} />
-                <Checkbox label="Allow direct play" checked={form.allow_direct_play} onChange={(v) => setForm({ ...form, allow_direct_play: v })} />
-                <Checkbox label="Disable seeking" checked={form.disable_seeking} onChange={(v) => setForm({ ...form, disable_seeking: v })} />
-                <Checkbox label="Per-item play count" checked={form.per_item_play_count} onChange={(v) => setForm({ ...form, per_item_play_count: v })} />
-              </div>
-              {form.require_pin && (
-                <label>
-                  PIN
-                  <input value={form.pin} onChange={(e) => setForm({ ...form, pin: e.target.value })} required={form.require_pin} />
-                </label>
-              )}
-              <div className="form-section">
-                <label>
-                  Watermark mode
-                  <select value={form.watermark_mode} onChange={(e) => setForm({ ...form, watermark_mode: e.target.value })}>
-                    <option value="none">None</option>
-                    <option value="visible">Visible overlay</option>
-                    <option value="burned_in">Burned in</option>
-                    <option value="forensic">Forensic metadata</option>
-                    <option value="all">All modes</option>
-                  </select>
-                </label>
-                <label className="wide-field">
-                  Watermark text
-                  <input value={form.watermark_profile} onChange={(e) => setForm({ ...form, watermark_profile: e.target.value })} placeholder="Guest pass {{pass_id}} · {{ip}} · {{time}}" />
-                </label>
-                <label className="wide-field">
-                  Watermark logo URL or local path
-                  <input value={form.watermark_logo_url} onChange={(e) => setForm({ ...form, watermark_logo_url: e.target.value })} placeholder="https://example.com/logo.png or /opt/continuum/logo.png" />
-                </label>
-                <label className="wide-field">
-                  IP allowlist
-                  <textarea value={form.ip_allowlist} onChange={(e) => setForm({ ...form, ip_allowlist: e.target.value })} rows={2} placeholder="One IP/CIDR per line, or comma separated" />
-                </label>
-                <label>
-                  Country allowlist
-                  <input value={form.country_allowlist} onChange={(e) => setForm({ ...form, country_allowlist: e.target.value })} placeholder="US, NL" />
-                </label>
-                <label>
-                  Geofence
-                  <input value={form.geofence} onChange={(e) => setForm({ ...form, geofence: e.target.value })} placeholder="US, NL" />
-                </label>
-              </div>
-            </>
-          )}
-          <div className="form-actions">
-            {created && (
-              <button type="button" onClick={() => printInvite(created)}>
-                <Printer size={16} /> Print invite
-              </button>
-            )}
-            <button className="primary" type="submit">
-              <Shield size={17} /> Create guest pass
-            </button>
-          </div>
-        </form>
-
-        <section className="panel pass-list">
-          <div className="panel-heading">
-            <h2>Recent Passes</h2>
-            <span className="badge">{passes.length} total</span>
-          </div>
-          <div className="metric-strip">
-            <Metric label="Active" value={String(passes.filter((pass) => pass.status === "active").length)} />
-            <Metric label="Revoked" value={String(passes.filter((pass) => pass.revoked_at || pass.status === "revoked").length)} />
-            <Metric label="Opened" value={String(passes.reduce((sum, pass) => sum + pass.open_count, 0))} />
-          </div>
-          {loading ? <p className="muted">Loading...</p> : null}
-          {!loading && passes.length === 0 ? <p className="muted">No passes yet.</p> : null}
-          {passes.map((pass) => (
-            <article className="pass-row" key={pass.id}>
+      <section className="workspace">
+        <div className="creation-rail">
+          {created && <ShareResult created={created} />}
+          <form className="panel creation-panel" onSubmit={createPass}>
+            <div className="panel-heading">
               <div>
-                <div className="row-title">{pass.title}</div>
-                <div className="muted">{buildPassRowMeta(pass).join(" · ")}</div>
-                <div className="metrics">
-                  <span>{pass.status}</span>
-                  <span>{formatUsageStat("Opens", pass.open_count, pass.max_opens)}</span>
-                  <span>{formatUsageStat("Plays", pass.play_count, pass.max_plays)}</span>
-                  {buildPassRowTags(pass).map((tag) => <span key={tag}>{tag}</span>)}
-                </div>
+                <h2>Configuration</h2>
+                <p className="panel-subtitle">Define the target, expiration, playback limits, and access controls.</p>
               </div>
-              <div className="row-actions">
-                {pass.share_url && (
-                  <button type="button" onClick={() => void copy(absoluteURL(pass.share_url!))} aria-label="Copy link">
-                    <Copy size={16} />
-                  </button>
-                )}
-                <button type="button" onClick={() => revoke(pass.id)} aria-label="Revoke">
-                  <Trash2 size={16} />
+              <span className="badge">New pass</span>
+            </div>
+            <div className="template-grid" aria-label="Guest pass templates">
+              {passTemplates.map((template) => (
+                <button key={template.id} type="button" onClick={() => applyTemplate(template.id)}>
+                  <span>
+                    <strong>{template.label}</strong>
+                    <small>{template.description}</small>
+                  </span>
                 </button>
-                <button type="button" onClick={() => duplicate(pass)} aria-label="Duplicate">
-                  <Copy size={16} />
-                </button>
-                <button type="button" onClick={() => void loadEvents(pass.id)} aria-label="Activity">
-                  <Activity size={16} />
-                </button>
-              </div>
-              {activeEventsPassID === pass.id && (
-                <div className="event-timeline">
-                  {eventLoading === pass.id ? <p className="muted">Loading activity...</p> : null}
-                  {eventLoading !== pass.id && (eventsByPass[pass.id]?.length ?? 0) === 0 ? <p className="muted">No activity recorded.</p> : null}
-                  {(eventsByPass[pass.id] ?? []).map((event) => (
-                    <div className={`event-row ${eventTone(event.type)}`} key={event.id}>
-                      <span>{event.type.replace(/_/g, " ")}</span>
-                      <small>{formatDate(event.created_at)}{event.ip ? ` · ${event.ip}` : ""}</small>
+              ))}
+            </div>
+            <div className="form-section">
+              <div className="media-picker wide-field">
+                <div className="media-search-row">
+                  <label>
+                    Search media
+                    <div className="search-input">
+                      <Search size={16} />
+                      <input value={mediaQuery} onChange={(e) => setMediaQuery(e.target.value)} placeholder="Title, episode, collection..." />
                     </div>
-                  ))}
+                  </label>
+                  <label>
+                    Type
+                    <select value={mediaType} onChange={(e) => setMediaType(e.target.value)}>
+                      <option value="all">All</option>
+                      <option value="movie">Movies</option>
+                      <option value="episode">Episodes</option>
+                    </select>
+                  </label>
                 </div>
-              )}
-            </article>
-          ))}
-        </section>
+                {selectedMedia && (
+                  <div className="selected-media">
+                    <MediaThumb item={selectedMedia} />
+                    <div>
+                      <strong>{mediaTitle(selectedMedia)}</strong>
+                      <span>{mediaMeta(selectedMedia)}</span>
+                    </div>
+                  </div>
+                )}
+                {mediaError && <p className="field-error">{mediaError}</p>}
+                {mediaLoading && <p className="muted">Searching...</p>}
+                {!mediaLoading && mediaQuery.trim().length >= 2 && mediaResults.length === 0 && !mediaError ? <p className="muted">No matches.</p> : null}
+                {mediaResults.length > 0 && (
+                  <div className="media-results">
+                    {mediaResults.map((item) => (
+                      <button
+                        className={selectedMedia && mediaID(selectedMedia) === mediaID(item) ? "media-result selected" : "media-result"}
+                        disabled={resolvingMediaId === mediaID(item)}
+                        key={`${mediaTargetType(item)}:${mediaID(item)}`}
+                        onClick={() => void selectMedia(item)}
+                        type="button"
+                      >
+                        <MediaThumb item={item} />
+                        <span>
+                          <strong>{mediaTitle(item)}</strong>
+                          <small>{resolvingMediaId === mediaID(item) ? "Selecting..." : mediaMeta(item)}</small>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <label className="wide-field">
+                Pass title
+                <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder={selectedMedia ? mediaTitle(selectedMedia) : ""} />
+              </label>
+              <label className="wide-field">
+                Note
+                <textarea value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} rows={3} />
+              </label>
+            </div>
+            <div className="form-section">
+              <NumberField label="Expires in hours" value={form.expires_in_hours} onChange={(v) => setForm({ ...form, expires_in_hours: v })} min={1} />
+              <NumberField label="Max plays" value={form.max_plays} onChange={(v) => setForm({ ...form, max_plays: v })} min={0} />
+              <label>
+                Max resolution
+                <select value={form.max_resolution} onChange={(e) => setForm({ ...form, max_resolution: e.target.value })}>
+                  <option value="480p">480p</option>
+                  <option value="720p">720p</option>
+                  <option value="1080p">1080p</option>
+                  <option value="4k">4K</option>
+                </select>
+              </label>
+            </div>
+            <div className="policy-preview">
+              <div>
+                <strong>Policy preview</strong>
+                <span>{selectedMedia ? mediaTitle(selectedMedia) : "Select media to complete the pass."}</span>
+              </div>
+              <ul>
+                {policySummary.map((item) => <li key={item}>{item}</li>)}
+              </ul>
+            </div>
+            <button className="text-button" type="button" onClick={() => setShowAdvanced((value) => !value)}>
+              {showAdvanced ? "Hide advanced options" : "Advanced options"}
+            </button>
+            {showAdvanced && (
+              <>
+                <div className="form-section">
+                  <NumberField label="Hours after first open" value={form.valid_hours_after_first_open} onChange={(v) => setForm({ ...form, valid_hours_after_first_open: v })} min={0} />
+                  <NumberField label="Max opens" value={form.max_opens} onChange={(v) => setForm({ ...form, max_opens: v })} min={0} />
+                  <NumberField label="Max watch minutes" value={form.max_watch_minutes} onChange={(v) => setForm({ ...form, max_watch_minutes: v })} min={0} />
+                  <NumberField label="Concurrent streams" value={form.max_concurrent_streams} onChange={(v) => setForm({ ...form, max_concurrent_streams: v })} min={1} />
+                  <NumberField label="Max devices" value={form.max_devices} onChange={(v) => setForm({ ...form, max_devices: v })} min={1} />
+                  <NumberField label="Session grace minutes" value={form.session_grace_minutes} onChange={(v) => setForm({ ...form, session_grace_minutes: v })} min={0} />
+                </div>
+                <div className="checkbox-grid">
+                  <Checkbox label="Require PIN" checked={form.require_pin} onChange={(v) => setForm({ ...form, require_pin: v })} />
+                  <Checkbox label="Lock to first IP" checked={form.lock_to_first_ip} onChange={(v) => setForm({ ...form, lock_to_first_ip: v })} />
+                  <Checkbox label="Allow downloads" checked={form.allow_downloads} onChange={(v) => setForm({ ...form, allow_downloads: v })} />
+                  <Checkbox label="Allow direct play" checked={form.allow_direct_play} onChange={(v) => setForm({ ...form, allow_direct_play: v })} />
+                  <Checkbox label="Disable seeking" checked={form.disable_seeking} onChange={(v) => setForm({ ...form, disable_seeking: v })} />
+                  <Checkbox label="Per-item play count" checked={form.per_item_play_count} onChange={(v) => setForm({ ...form, per_item_play_count: v })} />
+                </div>
+                {form.require_pin && (
+                  <label>
+                    PIN
+                    <input value={form.pin} onChange={(e) => setForm({ ...form, pin: e.target.value })} required={form.require_pin} />
+                  </label>
+                )}
+                <div className="form-section">
+                  <label>
+                    Watermark mode
+                    <select value={form.watermark_mode} onChange={(e) => setForm({ ...form, watermark_mode: e.target.value })}>
+                      <option value="none">None</option>
+                      <option value="visible">Visible overlay</option>
+                      <option value="burned_in">Burned in</option>
+                      <option value="forensic">Forensic metadata</option>
+                      <option value="all">All modes</option>
+                    </select>
+                  </label>
+                  <label className="wide-field">
+                    Watermark text
+                    <input value={form.watermark_profile} onChange={(e) => setForm({ ...form, watermark_profile: e.target.value })} placeholder="Guest pass {{pass_id}} · {{ip}} · {{time}}" />
+                  </label>
+                  <label className="wide-field">
+                    Watermark logo URL or local path
+                    <input value={form.watermark_logo_url} onChange={(e) => setForm({ ...form, watermark_logo_url: e.target.value })} placeholder="https://example.com/logo.png or /opt/continuum/logo.png" />
+                  </label>
+                  <label className="wide-field">
+                    IP allowlist
+                    <textarea value={form.ip_allowlist} onChange={(e) => setForm({ ...form, ip_allowlist: e.target.value })} rows={2} placeholder="One IP/CIDR per line, or comma separated" />
+                  </label>
+                  <label>
+                    Country allowlist
+                    <input value={form.country_allowlist} onChange={(e) => setForm({ ...form, country_allowlist: e.target.value })} placeholder="US, NL" />
+                  </label>
+                  <label>
+                    Geofence
+                    <input value={form.geofence} onChange={(e) => setForm({ ...form, geofence: e.target.value })} placeholder="US, NL" />
+                  </label>
+                </div>
+              </>
+            )}
+            <div className="form-actions">
+              <button className="primary" type="submit">
+                <Shield size={17} /> Create guest pass
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <aside className="monitoring-rail">
+          <form className="panel utility-panel" onSubmit={saveConfig}>
+            <div className="panel-heading">
+              <div>
+                <h2>Plugin settings</h2>
+                <p className="panel-subtitle">Control share link generation and audit event retention.</p>
+              </div>
+            </div>
+            <div className="form-section">
+              <label>
+                Public base URL
+                <input
+                  value={config.public_base_url}
+                  onChange={(e) => setConfig({ ...config, public_base_url: e.target.value })}
+                  placeholder="https://example.com/api/v1/plugins/guest-pass"
+                />
+              </label>
+              <label>
+                Audit retention days
+                <input
+                  min={1}
+                  type="number"
+                  value={config.audit_retention_days}
+                  onChange={(e) => setConfig({ ...config, audit_retention_days: Number(e.target.value) })}
+                />
+              </label>
+            </div>
+            <div className="form-actions">
+              <button type="submit">
+                <Shield size={16} /> Save settings
+              </button>
+              {configStatus && <span className="muted">{configStatus}</span>}
+            </div>
+          </form>
+
+          <section className="panel pass-list">
+            <div className="panel-heading">
+              <h2>Recent Passes</h2>
+              <span className="badge">{passes.length} total</span>
+            </div>
+            <div className="metric-strip">
+              <Metric label="Active" value={String(passes.filter((pass) => pass.status === "active").length)} />
+              <Metric label="Revoked" value={String(passes.filter((pass) => pass.revoked_at || pass.status === "revoked").length)} />
+              <Metric label="Opened" value={String(passes.reduce((sum, pass) => sum + pass.open_count, 0))} />
+            </div>
+            {loading ? <p className="muted">Loading...</p> : null}
+            {!loading && passes.length === 0 ? <p className="muted">No passes yet.</p> : null}
+            {passes.map((pass) => (
+              <article className="pass-row" key={pass.id}>
+                <div className="pass-row-copy">
+                  <div className="row-title">{pass.title}</div>
+                  <div className="row-meta">
+                    {buildPassRowMeta(pass).map((item) => (
+                      <span key={item}>{item}</span>
+                    ))}
+                  </div>
+                  <div className="metrics">
+                    <span>{pass.status}</span>
+                    <span>{formatUsageStat("Opens", pass.open_count, pass.max_opens)}</span>
+                    <span>{formatUsageStat("Plays", pass.play_count, pass.max_plays)}</span>
+                    {buildPassRowTags(pass).map((item) => (
+                      <span key={item}>{item}</span>
+                    ))}
+                  </div>
+                </div>
+                <div className="row-actions">
+                  {pass.share_url && (
+                    <button type="button" onClick={() => void copy(absoluteURL(pass.share_url!))}>
+                      <Copy size={15} />
+                      <span>Copy link</span>
+                    </button>
+                  )}
+                  <button type="button" onClick={() => duplicate(pass)}>
+                    <Copy size={15} />
+                    <span>Duplicate</span>
+                  </button>
+                  <button type="button" onClick={() => void loadEvents(pass.id)}>
+                    <Activity size={15} />
+                    <span>Activity</span>
+                  </button>
+                  <button className="danger-button" type="button" onClick={() => revoke(pass.id)}>
+                    <Trash2 size={15} />
+                    <span>Revoke</span>
+                  </button>
+                </div>
+                {activeEventsPassID === pass.id && (
+                  <div className="event-timeline">
+                    {eventLoading === pass.id ? <p className="muted">Loading activity...</p> : null}
+                    {eventLoading !== pass.id && (eventsByPass[pass.id]?.length ?? 0) === 0 ? <p className="muted">No activity recorded.</p> : null}
+                    {(eventsByPass[pass.id] ?? []).map((event) => (
+                      <div className={`event-row ${eventTone(event.type)}`} key={event.id}>
+                        <span>{event.type.replace(/_/g, " ")}</span>
+                        <small>{formatDate(event.created_at)}{event.ip ? ` · ${event.ip}` : ""}</small>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </article>
+            ))}
+          </section>
+        </aside>
       </section>
     </main>
   );
@@ -843,6 +844,30 @@ function Metric({ label, value }: { label: string; value: string }) {
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
+  );
+}
+
+function ShareResult({ created }: { created: CreateResponse }) {
+  const shareURL = absoluteURL(created.share_url);
+
+  return (
+    <section className="success share-result">
+      <div>
+        <p className="eyebrow">Share link ready</p>
+        <h2>{created.pass.title}</h2>
+        <code>{shareURL}</code>
+      </div>
+      <div className="share-actions">
+        <button type="button" onClick={() => void copy(shareURL)}>
+          <Copy size={16} />
+          <span>Copy link</span>
+        </button>
+        <button type="button" onClick={() => printInvite(created)}>
+          <Printer size={16} />
+          <span>Print invite</span>
+        </button>
+      </div>
+    </section>
   );
 }
 

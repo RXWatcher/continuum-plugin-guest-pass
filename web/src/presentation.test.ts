@@ -31,7 +31,7 @@ describe("buildPassRowTags", () => {
     ).toEqual(["PIN", "IP lock"]);
   });
 
-  it("includes download and direct play tags when enabled", () => {
+  it("includes download and direct-play affordances when enabled", () => {
     expect(
       buildPassRowTags({
         require_pin: false,
