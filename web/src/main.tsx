@@ -602,7 +602,8 @@ function AdminPage() {
               <Metric label="Opened" value={String(passes.reduce((sum, pass) => sum + pass.open_count, 0))} />
             </div>
             {loading ? (
-              <div className="loading-block" aria-label="Loading passes">
+              <div className="loading-block" role="status" aria-live="polite" aria-busy="true">
+                <span className="sr-only">Loading guest passes.</span>
                 <div className="skeleton-row" />
               </div>
             ) : null}
@@ -738,7 +739,7 @@ function GuestPassPage() {
     <main className="guest-shell">
       <section className="guest-panel">
         <div className="guest-hero">
-          {pass && <MediaThumb item={{ title: pass.title }} />}
+          <MediaThumb item={{ title: pass?.title ?? "Guest Pass" }} />
           <div className="guest-copy">
             <p className="eyebrow">Continuum guest pass</p>
             <h1>{pass?.title ?? "Guest Pass"}</h1>
@@ -807,8 +808,9 @@ function GuestPassPage() {
 
 function GuestLoadingState() {
   return (
-    <div className="loading-block">
-      <div className="skeleton-row" aria-label="Opening pass" />
+    <div className="loading-block" role="status" aria-live="polite" aria-busy="true">
+      <span className="sr-only">Opening guest pass.</span>
+      <div className="skeleton-row" />
     </div>
   );
 }

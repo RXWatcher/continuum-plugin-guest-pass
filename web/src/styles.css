@@ -960,6 +960,18 @@ code {
   color: var(--muted-foreground);
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .skeleton-row {
   height: 4rem;
   border-radius: calc(var(--radius) - 2px);
@@ -986,11 +998,18 @@ code {
 
 @media (max-width: 640px) {
   .guest-hero,
-  .guest-facts,
+  .guest-facts {
+    grid-template-columns: 1fr;
+  }
+
   .row-actions,
   .share-actions {
-    grid-template-columns: 1fr;
     flex-direction: column;
+  }
+
+  .guest-hero .media-thumb {
+    width: 100px;
+    height: 136px;
   }
 }
 
