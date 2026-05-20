@@ -41,7 +41,17 @@ postgres://plugin_guest_pass:password@postgres:5432/continuum?search_path=guest_
 CREATE ROLE plugin_guest_pass WITH LOGIN PASSWORD '<chosen>';
 CREATE SCHEMA guest_pass AUTHORIZATION plugin_guest_pass;
 GRANT CONNECT ON DATABASE continuum TO plugin_guest_pass;
+
+-- Required for resolving "best playable file" at pass-creation time.
+-- The plugin's catalog SEARCH is done through the host SDK, but the
+-- final content-id → media-file-id mapping still reads public.media_files
+-- because the SDK does not yet expose a resolver call.
+GRANT USAGE ON SCHEMA public TO plugin_guest_pass;
+GRANT SELECT ON public.media_files TO plugin_guest_pass;
 ```
+
+Migrations are applied automatically on plugin start via `golang-migrate`;
+the operator only needs to create the schema and grant the connect role.
 
 ## Operations
 
@@ -49,6 +59,19 @@ GRANT CONNECT ON DATABASE continuum TO plugin_guest_pass;
 - Set `public_base_url` when Continuum sits behind a reverse proxy and returned
   links need an absolute external origin.
 - Keep audit retention aligned with your privacy policy.
+
+## Known Limitations
+
+- Per-request client IP (used by `lock_to_first_ip`, `ip_allowlist`, audit
+  rows, and the `{{ip}}` watermark substitution) is read from the
+  `X-Continuum-Client-IP` header injected by the host. Until the host
+  starts stamping that header, IP-derived features are effectively inert
+  and audit rows record an empty IP. The plugin deliberately does **not**
+  fall back to `X-Forwarded-For` from arbitrary callers — that would
+  allow guests to spoof their own IP.
+- Catalog search goes through the host SDK (`ListLibraryMedia`), so the
+  plugin only needs `SELECT` on `public.media_files` (for file-id
+  resolution), not the full media catalog.
 
 ## Build And Test
 

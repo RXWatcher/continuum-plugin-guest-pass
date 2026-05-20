@@ -18,6 +18,7 @@ import (
 	sdkruntime "github.com/ContinuumApp/continuum-plugin-sdk/pkg/pluginsdk/runtime"
 
 	"github.com/ContinuumApp/continuum-plugin-guest-pass/internal/httproutes"
+	"github.com/ContinuumApp/continuum-plugin-guest-pass/internal/migrate"
 	"github.com/ContinuumApp/continuum-plugin-guest-pass/internal/poll"
 	pluginrt "github.com/ContinuumApp/continuum-plugin-guest-pass/internal/runtime"
 	"github.com/ContinuumApp/continuum-plugin-guest-pass/internal/server"
@@ -42,6 +43,9 @@ func main() {
 
 	rt := pluginrt.New(manifest, func(cfg pluginrt.Config) error {
 		ctx := context.Background()
+		if err := migrate.Run(ctx, cfg.DatabaseURL); err != nil {
+			return fmt.Errorf("migrate: %w", err)
+		}
 		pcfg, err := pgxpool.ParseConfig(cfg.DatabaseURL)
 		if err != nil {
 			return fmt.Errorf("parse database_url: %w", err)
@@ -52,10 +56,6 @@ func main() {
 		pool, err := pgxpool.NewWithConfig(ctx, pcfg)
 		if err != nil {
 			return fmt.Errorf("connect database: %w", err)
-		}
-		if err := store.Migrate(ctx, pool); err != nil {
-			pool.Close()
-			return fmt.Errorf("migrate: %w", err)
 		}
 		st := store.New(pool)
 		appCfg, err := st.ImportLegacyAppConfig(ctx, store.AppConfig{
