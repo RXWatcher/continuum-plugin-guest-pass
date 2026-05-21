@@ -79,7 +79,11 @@ Migrations under `internal/migrate/files` are applied automatically on startup; 
 
 ## Detailed docs
 
-- [`docs/setup-debug-flows.md`](docs/setup-debug-flows.md) — setup checklist, route map, operational flows, and a debugging runbook covering proxy 404s, expiry, scope review, and audit retention.
+- [`docs/operations.md`](docs/operations.md) — day-two runbook: config surfaces, the maintenance task, observability, lifecycle, credential rotation.
+- [`docs/debugging.md`](docs/debugging.md) — symptom-first triage for first-open expiry, proxy 404s, cap surprises, VPN/IP lock-outs, country-header gaps, watermarking, and the catalog grant.
+- [`docs/pass-policy-reference.md`](docs/pass-policy-reference.md) — every policy knob (expiry, caps, identity binding, watermarking) with defaults, enforcement site, and cross-field invariants.
+- [`docs/recipient-experience.md`](docs/recipient-experience.md) — what the guest sees, status strings, recipient-visible audit footprint, and recovery workflow.
+- [`docs/data-model.md`](docs/data-model.md) — table-by-table walkthrough, transaction patterns, the `public.media_files` cross-schema reach, and backup notes.
 
 ## Build and release
 
