@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/ContinuumApp/continuum-plugin-guest-pass/internal/store"
+	"github.com/RXWatcher/continuum-plugin-guest-pass/internal/store"
 )
 
 func TestClientIPReadsHostHeaderOnly(t *testing.T) {

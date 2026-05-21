@@ -1,4 +1,4 @@
-module github.com/ContinuumApp/continuum-plugin-guest-pass
+module github.com/RXWatcher/continuum-plugin-guest-pass
 
 go 1.26.0
 

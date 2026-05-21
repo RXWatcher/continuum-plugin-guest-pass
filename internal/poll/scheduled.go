@@ -6,7 +6,7 @@ import (
 
 	pluginv1 "github.com/ContinuumApp/continuum-plugin-sdk/pkg/pluginproto/continuum/plugin/v1"
 
-	"github.com/ContinuumApp/continuum-plugin-guest-pass/internal/store"
+	"github.com/RXWatcher/continuum-plugin-guest-pass/internal/store"
 )
 
 type Config struct {

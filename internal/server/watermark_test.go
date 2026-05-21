@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ContinuumApp/continuum-plugin-guest-pass/internal/store"
+	"github.com/RXWatcher/continuum-plugin-guest-pass/internal/store"
 )
 
 func TestNormalizeWatermarkMode(t *testing.T) {

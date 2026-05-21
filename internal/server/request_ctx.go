@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/ContinuumApp/continuum-plugin-guest-pass/internal/store"
+	"github.com/RXWatcher/continuum-plugin-guest-pass/internal/store"
 )
 
 // HeaderClientIP is the host-injected header containing the resolved

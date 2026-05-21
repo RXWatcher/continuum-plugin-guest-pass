@@ -17,13 +17,13 @@ import (
 	publicmanifest "github.com/ContinuumApp/continuum-plugin-sdk/pkg/pluginsdk/manifest"
 	sdkruntime "github.com/ContinuumApp/continuum-plugin-sdk/pkg/pluginsdk/runtime"
 
-	"github.com/ContinuumApp/continuum-plugin-guest-pass/internal/httproutes"
-	"github.com/ContinuumApp/continuum-plugin-guest-pass/internal/migrate"
-	"github.com/ContinuumApp/continuum-plugin-guest-pass/internal/poll"
-	pluginrt "github.com/ContinuumApp/continuum-plugin-guest-pass/internal/runtime"
-	"github.com/ContinuumApp/continuum-plugin-guest-pass/internal/server"
-	"github.com/ContinuumApp/continuum-plugin-guest-pass/internal/store"
-	"github.com/ContinuumApp/continuum-plugin-guest-pass/web"
+	"github.com/RXWatcher/continuum-plugin-guest-pass/internal/httproutes"
+	"github.com/RXWatcher/continuum-plugin-guest-pass/internal/migrate"
+	"github.com/RXWatcher/continuum-plugin-guest-pass/internal/poll"
+	pluginrt "github.com/RXWatcher/continuum-plugin-guest-pass/internal/runtime"
+	"github.com/RXWatcher/continuum-plugin-guest-pass/internal/server"
+	"github.com/RXWatcher/continuum-plugin-guest-pass/internal/store"
+	"github.com/RXWatcher/continuum-plugin-guest-pass/web"
 )
 
 //go:embed manifest.json

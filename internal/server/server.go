@@ -25,7 +25,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/hashicorp/go-hclog"
 
-	"github.com/ContinuumApp/continuum-plugin-guest-pass/internal/store"
+	"github.com/RXWatcher/continuum-plugin-guest-pass/internal/store"
 )
 
 // Deps wires the server's collaborators. WebFS may be nil during early

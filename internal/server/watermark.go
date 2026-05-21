@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ContinuumApp/continuum-plugin-guest-pass/internal/store"
+	"github.com/RXWatcher/continuum-plugin-guest-pass/internal/store"
 )
 
 // normalizeWatermarkMode parses the operator-supplied watermark mode

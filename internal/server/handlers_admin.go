@@ -10,8 +10,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/ContinuumApp/continuum-plugin-guest-pass/internal/auth"
-	"github.com/ContinuumApp/continuum-plugin-guest-pass/internal/store"
+	"github.com/RXWatcher/continuum-plugin-guest-pass/internal/auth"
+	"github.com/RXWatcher/continuum-plugin-guest-pass/internal/store"
 )
 
 // createPassRequest mirrors the admin create-pass JSON body.
