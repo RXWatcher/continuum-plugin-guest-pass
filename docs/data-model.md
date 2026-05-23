@@ -145,6 +145,6 @@ Future migrations should follow the same numbering convention (`0002_*.up.sql` /
 
 ## Backup considerations
 
-The plugin's data is independent from the host's: backing up `pg_dump --schema=guest_pass continuum > guest_pass.sql` captures every pass, audit row, and config row in isolation. Restoring is similarly self-contained.
+The plugin's data is independent from the host's: backing up `pg_dump --schema=guest_pass silo > guest_pass.sql` captures every pass, audit row, and config row in isolation. Restoring is similarly self-contained.
 
 `guest_pass_events` dominates volume; the rest is tiny.

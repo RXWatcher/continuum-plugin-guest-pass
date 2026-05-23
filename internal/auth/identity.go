@@ -3,8 +3,8 @@ package auth
 import "net/http"
 
 const (
-	HeaderUserID = "X-Continuum-User-Id"
-	HeaderRole   = "X-Continuum-User-Role"
+	HeaderUserID = "X-Silo-User-Id"
+	HeaderRole   = "X-Silo-User-Role"
 )
 
 type Identity struct {

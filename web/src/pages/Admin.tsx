@@ -173,7 +173,7 @@ export function Admin() {
               className="text-muted-foreground hover:bg-surface-hover hover:text-foreground inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium transition-colors"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
-              Continuum
+              Silo
             </a>
             <p className="text-xs uppercase tracking-wide text-muted-foreground">
               Plugin administration

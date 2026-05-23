@@ -12,7 +12,7 @@ The authoritative type is `store.Pass` (`internal/store/pass.go`). Validation an
 | `target_type` | yes | Only `media_file` is accepted today (`validTargetType`). Other values reject with HTTP 400 `bad_target_type`. |
 | `target_id` | yes | For `media_file`, must parse as a positive integer when minting the stream grant. The admin UI fills this from the catalog search resolver. |
 | `note` | no | Operator-only memo. Never shown to the recipient. |
-| `created_by` | auto | Stamped from `X-Continuum-User-Id` at create time. Not user-supplied. |
+| `created_by` | auto | Stamped from `X-Silo-User-Id` at create time. Not user-supplied. |
 
 ## Expiry
 
@@ -86,7 +86,7 @@ Template substitutions:
 
 - `{{pass_id}}` — numeric pass id.
 - `{{title}}` — pass title.
-- `{{ip}}` — `clientIP(r)` from `X-Continuum-Client-IP`.
+- `{{ip}}` — `clientIP(r)` from `X-Silo-Client-IP`.
 - `{{device_id}}` — request device id (real or fallback).
 - `{{subject}}` — literal `guest-pass:<id>`.
 - `{{time}}` — current UTC time, RFC3339.

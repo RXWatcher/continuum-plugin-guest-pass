@@ -1,13 +1,13 @@
-# Guest Pass for Continuum
+# Guest Pass for Silo
 
-`continuum.guest-pass` issues short-lived public links for tightly scoped media access. An authenticated Continuum operator can invite a friend to one show or movie without provisioning an account: each pass carries its own token, scope, expiry, and per-pass policy knobs (concurrency cap, watermark, PIN, IP/country allowlist, etc.).
+`silo.guest-pass` issues short-lived public links for tightly scoped media access. An authenticated Silo operator can invite a friend to one show or movie without provisioning an account: each pass carries its own token, scope, expiry, and per-pass policy knobs (concurrency cap, watermark, PIN, IP/country allowlist, etc.).
 
 ## Category
 
 Lives under **Sharing**. The Sharing category currently contains two plugins:
 
-- [`continuum.guest-pass`](https://github.com/RXWatcher/continuum-plugin-guest-pass) (this) — one-to-one invites to a specific item or library slice.
-- [`continuum.public-catalog`](https://github.com/RXWatcher/continuum-plugin-public-catalog) — a public-facing landing/advertising page for the library.
+- [`silo.guest-pass`](https://github.com/RXWatcher/silo-plugin-guest-pass) (this) — one-to-one invites to a specific item or library slice.
+- [`silo.public-catalog`](https://github.com/RXWatcher/silo-plugin-public-catalog) — a public-facing landing/advertising page for the library.
 
 ## Capabilities
 
@@ -20,11 +20,11 @@ Lives under **Sharing**. The Sharing category currently contains two plugins:
 
 Standalone sharing layer. The plugin does not depend on other plugins for core operation:
 
-- Catalog browsing in the admin UI goes through the Continuum host SDK (`ListLibraryMedia`).
+- Catalog browsing in the admin UI goes through the Silo host SDK (`ListLibraryMedia`).
 - Final content-ID → media-file-ID resolution at pass-creation time reads `public.media_files` directly (a `SELECT` grant on that single table is required until the SDK exposes a resolver call).
 - Guest playback flows through the host's scoped stream grants — the plugin never exposes broad library permissions to the public route.
 
-Host: [`ContinuumApp/continuum`](https://github.com/ContinuumApp/continuum). SDK: [`ContinuumApp/continuum-plugin-sdk`](https://github.com/ContinuumApp/continuum-plugin-sdk).
+Host: [`ContinuumApp/silo`](https://github.com/ContinuumApp/silo). SDK: [`ContinuumApp/continuum-plugin-sdk`](https://github.com/ContinuumApp/continuum-plugin-sdk).
 
 ## External services
 
@@ -43,7 +43,7 @@ A pass targets either a specific item or a library slice via `target_type` / `ta
 - **Watermarking.** `watermark_mode`, `watermark_profile`, `watermark_logo_url`, with `{{ip}}` substitution available in profiles.
 - **Lifecycle.** `revoked_at` is set by the admin endpoint and short-circuits `Status` to `revoked`. Status also rolls forward to `expired`, `open_limit_reached`, or `play_limit_reached` as caps are hit.
 
-> Per-request client IP feeds `lock_to_first_ip`, `ip_allowlist`, audit rows, and the `{{ip}}` watermark token. It is read from the `X-Continuum-Client-IP` header injected by the host — the plugin deliberately does **not** fall back to `X-Forwarded-For` from arbitrary callers, since that would let guests spoof their own IP. Until the host stamps that header, IP-derived features are inert and audit rows record an empty IP.
+> Per-request client IP feeds `lock_to_first_ip`, `ip_allowlist`, audit rows, and the `{{ip}}` watermark token. It is read from the `X-Silo-Client-IP` header injected by the host — the plugin deliberately does **not** fall back to `X-Forwarded-For` from arbitrary callers, since that would let guests spoof their own IP. Until the host stamps that header, IP-derived features are inert and audit rows record an empty IP.
 
 ## Audit
 
@@ -56,13 +56,13 @@ The `maintenance` scheduled task runs every six hours and calls `PruneEvents(ret
 | Key | Required | Description |
 | --- | --- | --- |
 | `database_url` | yes | Postgres DSN for the `guest_pass` schema. The role only needs ownership of `guest_pass` plus `SELECT` on `public.media_files`. |
-| `public_base_url` | no | Absolute URL used when returning share links. Empty returns plugin-relative paths; set this when Continuum sits behind a reverse proxy and links need an absolute external origin. Validated as an absolute URL on configure. |
+| `public_base_url` | no | Absolute URL used when returning share links. Empty returns plugin-relative paths; set this when Silo sits behind a reverse proxy and links need an absolute external origin. Validated as an absolute URL on configure. |
 | `audit_retention_days` | no | Days of audit history to keep. Defaults to 180; values below 1 fall back to the default. |
 
 Example DSN:
 
 ```text
-postgres://plugin_guest_pass:password@postgres:5432/continuum?search_path=guest_pass&sslmode=disable
+postgres://plugin_guest_pass:password@postgres:5432/silo?search_path=guest_pass&sslmode=disable
 ```
 
 Database setup:
@@ -70,7 +70,7 @@ Database setup:
 ```sql
 CREATE ROLE plugin_guest_pass WITH LOGIN PASSWORD '<chosen>';
 CREATE SCHEMA guest_pass AUTHORIZATION plugin_guest_pass;
-GRANT CONNECT ON DATABASE continuum TO plugin_guest_pass;
+GRANT CONNECT ON DATABASE silo TO plugin_guest_pass;
 GRANT USAGE ON SCHEMA public TO plugin_guest_pass;
 GRANT SELECT ON public.media_files TO plugin_guest_pass;
 ```
@@ -92,4 +92,4 @@ make build
 make test
 ```
 
-CI builds linux-amd64 binaries on push to main via the reusable workflow in [RXWatcher/continuum-plugin-repository](https://github.com/RXWatcher/continuum-plugin-repository) and publishes them to the catalog at [`./binaries/`](https://github.com/RXWatcher/continuum-plugin-repository/tree/main/binaries).
+CI builds linux-amd64 binaries on push to main via the reusable workflow in [RXWatcher/silo-plugin-repository](https://github.com/RXWatcher/silo-plugin-repository) and publishes them to the catalog at [`./binaries/`](https://github.com/RXWatcher/silo-plugin-repository/tree/main/binaries).

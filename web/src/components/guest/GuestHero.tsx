@@ -17,7 +17,7 @@ export function GuestHero({ pass }: Props) {
       <MediaThumb title={title} className="h-24 w-16" />
       <div className="min-w-0 space-y-1">
         <p className="text-xs uppercase tracking-wide text-muted-foreground">
-          Continuum guest pass
+          Silo guest pass
         </p>
         <h1 className="text-2xl font-semibold">{title}</h1>
         {pass?.note && <p className="text-sm text-muted-foreground">{pass.note}</p>}

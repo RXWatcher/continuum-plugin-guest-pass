@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/RXWatcher/continuum-plugin-guest-pass/internal/store"
+	"github.com/RXWatcher/silo-plugin-guest-pass/internal/store"
 )
 
 // HeaderClientIP is the host-injected header containing the resolved
@@ -21,7 +21,7 @@ import (
 // IPAllowlist, audit IPs, watermark {{ip}} substitution) become live
 // automatically. Until then clientIP returns "" and those features
 // are effectively inert.
-const HeaderClientIP = "X-Continuum-Client-IP"
+const HeaderClientIP = "X-Silo-Client-IP"
 
 // accessRequest is the JSON body sent to public open/play endpoints.
 type accessRequest struct {

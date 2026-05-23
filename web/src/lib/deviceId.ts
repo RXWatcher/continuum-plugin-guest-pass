@@ -2,7 +2,7 @@
 // MaxDevices. Persisted to localStorage so the same browser session keeps
 // the same id across reloads; falls back to a one-shot UUID for tabs
 // where localStorage is unavailable (private browsing).
-const KEY = "continuum.guestPass.deviceId";
+const KEY = "silo.guestPass.deviceId";
 
 export function guestDeviceID(): string {
   try {

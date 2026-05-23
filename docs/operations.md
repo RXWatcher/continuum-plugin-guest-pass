@@ -1,6 +1,6 @@
 # Operations
 
-Day-two runbook for operators running `continuum.guest-pass`. The README covers _what_ the plugin is and _how_ to install it; this page covers _running_ it: configuration changes, the maintenance task, observability, and lifecycle actions.
+Day-two runbook for operators running `silo.guest-pass`. The README covers _what_ the plugin is and _how_ to install it; this page covers _running_ it: configuration changes, the maintenance task, observability, and lifecycle actions.
 
 ## Configuration surfaces
 
@@ -55,7 +55,7 @@ The retention default is 180 days. Values below 1 fall back to the default (defe
 
 `writeInternal` is the only path that logs through `Deps.Logger` (an `hclog.Logger` wired from `cmd/.../main.go`). Best-effort audit writes (`RecordEvent` failures) are swallowed silently — the public flow does not block on the audit table. If you need to see why an audit row didn't land, add temporary logging there.
 
-Plugin process logs go through the Continuum host's plugin-log channel. Look for `name=continuum-plugin-guest-pass` lines.
+Plugin process logs go through the Silo host's plugin-log channel. Look for `name=silo-plugin-guest-pass` lines.
 
 ## Observability checklist
 
@@ -71,7 +71,7 @@ Event-type naming convention: successful actions are bare verbs (`opened`, `crea
 ## Rotating database credentials
 
 1. Edit the role's password in Postgres.
-2. Update the `database_url` in the plugin install config in the Continuum admin UI.
+2. Update the `database_url` in the plugin install config in the Silo admin UI.
 3. The host re-invokes `Configure`, which builds a new pool, swaps it in atomically (`poolPtr.Swap`), and closes the old one. No restart required.
 
 Migrations run in `Configure` (`migrate.Run(ctx, cfg.DatabaseURL)`); they are idempotent (`golang-migrate` with file source). Re-configuring is safe.
@@ -93,4 +93,4 @@ If `guest_pass_events` size becomes a problem, lower `audit_retention_days`. The
 
 ## Host header dependency
 
-Read `debugging.md` (the `X-Continuum-Client-IP` section) before enabling any IP-based policy. The plugin deliberately does not fall back to `X-Forwarded-For`; if the host has not stamped the resolved client IP, every IP-derived policy is inert and audit rows record empty IPs.
+Read `debugging.md` (the `X-Silo-Client-IP` section) before enabling any IP-based policy. The plugin deliberately does not fall back to `X-Forwarded-For`; if the host has not stamped the resolved client IP, every IP-derived policy is inert and audit rows record empty IPs.

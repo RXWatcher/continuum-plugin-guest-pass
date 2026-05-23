@@ -3,7 +3,7 @@ package server
 import (
 	"net/http"
 
-	"github.com/RXWatcher/continuum-plugin-guest-pass/internal/auth"
+	"github.com/RXWatcher/silo-plugin-guest-pass/internal/auth"
 )
 
 // requireStore short-circuits with 503 when the plugin hasn't been

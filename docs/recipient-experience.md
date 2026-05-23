@@ -64,7 +64,7 @@ Note that `ip_locked` and `ip_not_allowed` look identical to the recipient ("acc
 
 The plugin records `opened` events to `guest_pass_events` with the recipient's IP, user agent, and best-fit device id. This is visible to the admin via the events list (200 most recent per pass). The recipient is not told the audit exists; depending on the operator's privacy posture they may want to communicate it.
 
-Audit IPs depend on the host stamping `X-Continuum-Client-IP`. If that's not happening yet, recipient IPs in audit rows will be empty.
+Audit IPs depend on the host stamping `X-Silo-Client-IP`. If that's not happening yet, recipient IPs in audit rows will be empty.
 
 ## Recovering a stuck recipient
 

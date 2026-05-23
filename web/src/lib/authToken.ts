@@ -4,7 +4,7 @@
 // stored in localStorage/sessionStorage, so browser history doesn't keep
 // a copy after the tab closes.
 //
-// Continuum sometimes hands operators an admin URL with ?token=... that
+// Silo sometimes hands operators an admin URL with ?token=... that
 // the plugin needs to authenticate against; the strip keeps it from
 // leaking through referrers or screen-share captures.
 let cachedToken = "";
@@ -13,11 +13,11 @@ export function captureTokenFromURL(): void {
   const params = new URLSearchParams(window.location.search);
   cachedToken = params.get("token") || "";
 
-  const theme = params.get("theme") || sessionStorage.getItem("continuum-theme") || "";
+  const theme = params.get("theme") || sessionStorage.getItem("silo-theme") || "";
   if (theme) {
     document.documentElement.dataset.theme = theme;
     try {
-      sessionStorage.setItem("continuum-theme", theme);
+      sessionStorage.setItem("silo-theme", theme);
     } catch {
       // Ignore storage failures in private browsing contexts.
     }

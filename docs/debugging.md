@@ -24,7 +24,7 @@ If `first_opened_at` is non-NULL and small `valid_hours_after_first_open` × hou
 Five candidates, in order of likelihood:
 
 1. **Wrong public URL.** `share_url` in the create response is built from `public_base_url`. If that's empty, the link is plugin-relative (`/p/<token>`) — fine when the operator copies from a browser tab that already has the right origin, broken when they paste it into chat. Set `public_base_url` in `Config` to the externally reachable origin.
-2. **Reverse proxy not forwarding `/p/*`.** The host typically forwards all plugin routes, but a custom proxy in front of Continuum may only forward `/api/*`. The pass page is served by the plugin SPA at `GET /p/{token}` (see `manifest.json` http_routes). Confirm it reaches the plugin.
+2. **Reverse proxy not forwarding `/p/*`.** The host typically forwards all plugin routes, but a custom proxy in front of Silo may only forward `/api/*`. The pass page is served by the plugin SPA at `GET /p/{token}` (see `manifest.json` http_routes). Confirm it reaches the plugin.
 3. **Token typo.** Tokens are URL-safe base64 of 32 random bytes (43 chars). One wrong character → `GetPassByToken` returns `ErrNotFound` → `publicNotFound` writes `{"status":"not_found"}` with 404.
 4. **Pass revoked or in a non-active terminal state.** The preview endpoint returns 403 with `{"status":"revoked"|"expired"|…}` rather than 404 in those cases. So an actual 404 means the token never matched.
 5. **Plugin not configured.** `requireStore` middleware returns 503 with `{"error":{"code":"not_configured"}}`. If the recipient is seeing 503 not 404, the plugin's `database_url` is missing.
@@ -51,7 +51,7 @@ WHERE pass_id = $1 AND expires_at > NOW();
 
 ## "IP allowlist locked me out after a VPN switch"
 
-`lock_to_first_ip` is the more common offender: the first request that lands on `/api/public/passes/{token}/open` writes its IP into `guest_passes.first_ip`. Every subsequent request whose `X-Continuum-Client-IP` doesn't match is rejected with `{"status":"ip_locked"}`. The lock is set on **first open**, not first preview.
+`lock_to_first_ip` is the more common offender: the first request that lands on `/api/public/passes/{token}/open` writes its IP into `guest_passes.first_ip`. Every subsequent request whose `X-Silo-Client-IP` doesn't match is rejected with `{"status":"ip_locked"}`. The lock is set on **first open**, not first preview.
 
 Fix options:
 
@@ -68,7 +68,7 @@ Cloudflare in front: `CF-IPCountry` is set automatically. Other proxies: you mus
 
 `country_allowlist` and `geofence` are unioned — both treated as allowlists. If the operator filled in `country_allowlist=["NL"]` and `geofence=["BE"]`, requests from NL or BE pass.
 
-## "X-Continuum-Client-IP is empty in all my audit rows"
+## "X-Silo-Client-IP is empty in all my audit rows"
 
 Expected when the host has not stamped the header. The plugin deliberately does **not** read `X-Forwarded-For` from the request — see the comment in `internal/server/request_ctx.go`. Spoof-resistance: a guest cannot lie about their IP because the only header the plugin trusts is one the host injects on the gRPC-forwarded request.
 
@@ -92,14 +92,14 @@ Cannot happen: `token_hash` has a UNIQUE constraint (migration `0001_init.up.sql
 
 ## "Watermark text doesn't render the IP"
 
-`renderWatermarkText` substitutes `{{ip}}` from the request's `clientIP(r)`. If the host hasn't stamped `X-Continuum-Client-IP`, `clientIP` returns empty and the template ends up with a literal blank where the IP would be. See the "IP is empty" entry above.
+`renderWatermarkText` substitutes `{{ip}}` from the request's `clientIP(r)`. If the host hasn't stamped `X-Silo-Client-IP`, `clientIP` returns empty and the template ends up with a literal blank where the IP would be. See the "IP is empty" entry above.
 
 Also: substitution is one-pass. A title containing `{{pass_id}}` will _not_ recursively expand if used inside the template — by design (the comment in `watermark.go` calls this out).
 
 ## Admin endpoint returns 401/403
 
-- **401 `unauthenticated`** — the host did not forward `X-Continuum-User-Id`. Check that the request is hitting the plugin via the host's authenticated admin route, not directly.
-- **403 `forbidden`** — user is authenticated but `X-Continuum-User-Role != "admin"`. Their host-side role needs to be admin.
+- **401 `unauthenticated`** — the host did not forward `X-Silo-User-Id`. Check that the request is hitting the plugin via the host's authenticated admin route, not directly.
+- **403 `forbidden`** — user is authenticated but `X-Silo-User-Role != "admin"`. Their host-side role needs to be admin.
 
 ## Catalog search returns empty or `playable=false`
 

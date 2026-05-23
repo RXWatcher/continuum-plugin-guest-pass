@@ -17,8 +17,8 @@ func TestAPIReturnsNotConfiguredBeforeStoreWired(t *testing.T) {
 		"/api/admin/config",
 	} {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
-		req.Header.Set("X-Continuum-User-Id", "admin-1")
-		req.Header.Set("X-Continuum-User-Role", "admin")
+		req.Header.Set("X-Silo-User-Id", "admin-1")
+		req.Header.Set("X-Silo-User-Role", "admin")
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, req)
 
@@ -37,7 +37,7 @@ func TestPluginBaseHref(t *testing.T) {
 	for mountPath, want := range tests {
 		req := httptest.NewRequest(http.MethodGet, "/admin", nil)
 		if mountPath != "" {
-			req.Header.Set("X-Continuum-Plugin-Mount-Path", mountPath)
+			req.Header.Set("X-Silo-Plugin-Mount-Path", mountPath)
 		}
 		if got := pluginBaseHref(req); got != want {
 			t.Fatalf("pluginBaseHref(%q) = %q, want %q", mountPath, got, want)

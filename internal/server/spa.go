@@ -30,7 +30,7 @@ func hSPA(d Deps) http.HandlerFunc {
 }
 
 func injectTheme(body []byte, r *http.Request) []byte {
-	theme := r.Header.Get("X-Continuum-Theme")
+	theme := r.Header.Get("X-Silo-Theme")
 	if theme == "" {
 		theme = r.URL.Query().Get("theme")
 	}
@@ -57,7 +57,7 @@ func loadIndex(webFS fs.FS) ([]byte, error) {
 // pluginBaseHref derives the SPA's <base href> from the mount-path header
 // the host injects. Without it the SPA falls back to relative URLs.
 func pluginBaseHref(r *http.Request) string {
-	mountPath := strings.TrimRight(r.Header.Get("X-Continuum-Plugin-Mount-Path"), "/")
+	mountPath := strings.TrimRight(r.Header.Get("X-Silo-Plugin-Mount-Path"), "/")
 	if mountPath != "" {
 		return mountPath + "/"
 	}

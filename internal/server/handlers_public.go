@@ -13,7 +13,7 @@ import (
 	sdkruntime "github.com/ContinuumApp/continuum-plugin-sdk/pkg/pluginsdk/runtime"
 	"github.com/ContinuumApp/continuum-plugin-sdk/pkg/pluginsdk/runtimehost"
 
-	"github.com/RXWatcher/continuum-plugin-guest-pass/internal/store"
+	"github.com/RXWatcher/silo-plugin-guest-pass/internal/store"
 )
 
 // hPublicPassPreview returns the pass shape without recording an "opened"

@@ -26,7 +26,7 @@ export function printInvite(passTitle: string, shareURL: string): void {
   const h1 = doc.createElement("h1");
   h1.textContent = passTitle;
   const p = doc.createElement("p");
-  p.textContent = "Your Continuum guest pass is ready.";
+  p.textContent = "Your Silo guest pass is ready.";
   const code = doc.createElement("code");
   code.textContent = absoluteURL(shareURL);
 

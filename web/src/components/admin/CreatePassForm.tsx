@@ -242,7 +242,7 @@ function AdvancedFields({ value, onChange }: { value: PassDraft; onChange: (next
             id="watermark-logo"
             value={value.watermark_logo_url}
             onChange={(e) => update({ watermark_logo_url: e.target.value })}
-            placeholder="https://example.com/logo.png or /opt/continuum/logo.png"
+            placeholder="https://example.com/logo.png or /opt/silo/logo.png"
           />
         </div>
       </div>

@@ -6,7 +6,7 @@ const LIGHT_THEMES = new Set(["cinema-light"]);
 // Toaster reads the host-injected theme from document.documentElement so
 // toasts visually match the rest of the host UI. lib/authToken sets that
 // dataset attribute during boot from either the URL ?theme= or the
-// X-Continuum-Theme response.
+// X-Silo-Theme response.
 const Toaster = ({ ...props }: ToasterProps) => {
   const theme = typeof document !== "undefined" ? document.documentElement.dataset.theme ?? "" : "";
   const sonnerTheme = LIGHT_THEMES.has(theme) ? "light" : "dark";
