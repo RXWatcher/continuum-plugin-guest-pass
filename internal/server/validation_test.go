@@ -37,6 +37,43 @@ func TestParseExpiryAbsoluteAndRelative(t *testing.T) {
 	}
 }
 
+func TestCapUnlimited(t *testing.T) {
+	// 0 means unlimited and is preserved.
+	if got := capUnlimited(0, maxPlaysCap); got != 0 {
+		t.Fatalf("capUnlimited(0) = %d, want 0 (unlimited preserved)", got)
+	}
+	// Negative is clamped to 0 (unlimited), matching nonNegative semantics.
+	if got := capUnlimited(-5, maxPlaysCap); got != 0 {
+		t.Fatalf("capUnlimited(-5) = %d, want 0", got)
+	}
+	// Within range passes through.
+	if got := capUnlimited(50, maxPlaysCap); got != 50 {
+		t.Fatalf("capUnlimited(50) = %d, want 50", got)
+	}
+	// Above cap is clamped.
+	if got := capUnlimited(maxPlaysCap+1, maxPlaysCap); got != maxPlaysCap {
+		t.Fatalf("capUnlimited(>cap) = %d, want %d", got, maxPlaysCap)
+	}
+}
+
+func TestCapPositive(t *testing.T) {
+	// Non-positive falls back to the fallback value.
+	if got := capPositive(0, 1, maxConcurrentStreamsCap); got != 1 {
+		t.Fatalf("capPositive(0) = %d, want fallback 1", got)
+	}
+	if got := capPositive(-3, 2, maxConcurrentStreamsCap); got != 2 {
+		t.Fatalf("capPositive(-3) = %d, want fallback 2", got)
+	}
+	// Within range passes through.
+	if got := capPositive(5, 1, maxConcurrentStreamsCap); got != 5 {
+		t.Fatalf("capPositive(5) = %d, want 5", got)
+	}
+	// Above cap is clamped.
+	if got := capPositive(maxConcurrentStreamsCap+10, 1, maxConcurrentStreamsCap); got != maxConcurrentStreamsCap {
+		t.Fatalf("capPositive(>cap) = %d, want %d", got, maxConcurrentStreamsCap)
+	}
+}
+
 func TestValidTargetTypeOnlyAllowsPlayableMediaFile(t *testing.T) {
 	if !validTargetType("media_file") {
 		t.Fatal("media_file should be accepted")

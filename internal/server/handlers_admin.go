@@ -98,11 +98,11 @@ func hCreatePass(d Deps) http.HandlerFunc {
 			CreatedBy:                id.UserID,
 			ExpiresAt:                expiresAt,
 			ValidHoursAfterFirstOpen: nonNegative(req.ValidHoursAfterFirstOpen),
-			MaxOpens:                 nonNegative(req.MaxOpens),
-			MaxPlays:                 nonNegative(req.MaxPlays),
-			MaxWatchMinutes:          nonNegative(req.MaxWatchMinutes),
-			MaxConcurrentStreams:     defaultPositive(req.MaxConcurrentStreams, 1),
-			MaxDevices:               defaultPositive(req.MaxDevices, 1),
+			MaxOpens:                 capUnlimited(req.MaxOpens, maxOpensCap),
+			MaxPlays:                 capUnlimited(req.MaxPlays, maxPlaysCap),
+			MaxWatchMinutes:          capUnlimited(req.MaxWatchMinutes, maxWatchMinutesCap),
+			MaxConcurrentStreams:     capPositive(req.MaxConcurrentStreams, 1, maxConcurrentStreamsCap),
+			MaxDevices:               capPositive(req.MaxDevices, 1, maxDevicesCap),
 			MaxResolution:            defaultString(req.MaxResolution, "1080p"),
 			AllowDownloads:           req.AllowDownloads,
 			AllowDirectPlay:          req.AllowDirectPlay,
@@ -123,7 +123,7 @@ func hCreatePass(d Deps) http.HandlerFunc {
 			writeInternal(w, r, d, "create_failed", err)
 			return
 		}
-		_ = d.Store.RecordEvent(r.Context(), p.ID, "created", clientIP(r), r.UserAgent(), nil)
+		_ = d.Store.RecordEvent(r.Context(), p.ID, "created", clientIP(r), r.UserAgent(), adminAttrs(r, "admin minted guest pass"))
 		baseURL := publicBaseURL(r, d)
 		writeJSON(w, http.StatusCreated, map[string]any{
 			"pass":      decoratePass(*p, token, baseURL, time.Now()),
@@ -148,8 +148,23 @@ func hRevokePass(d Deps) http.HandlerFunc {
 			writeInternal(w, r, d, "revoke_failed", err)
 			return
 		}
-		_ = d.Store.RecordEvent(r.Context(), id, "revoked", clientIP(r), r.UserAgent(), nil)
+		_ = d.Store.RecordEvent(r.Context(), id, "revoked", clientIP(r), r.UserAgent(), adminAttrs(r, "admin revoked guest pass"))
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	}
+}
+
+// adminAttrs builds the audit attrs for an admin-initiated action, stamping
+// the acting user (X-Silo-User-Id) and a human-readable reason so the event
+// log records who minted or revoked a pass and why. When the host did not
+// stamp a user id the actor is recorded as "unknown" rather than dropped.
+func adminAttrs(r *http.Request, reason string) map[string]any {
+	actor := "unknown"
+	if id, ok := auth.FromRequest(r); ok && strings.TrimSpace(id.UserID) != "" {
+		actor = id.UserID
+	}
+	return map[string]any{
+		"actor":  actor,
+		"reason": reason,
 	}
 }
 

@@ -34,10 +34,25 @@ type Deps struct {
 	Store  *store.Store
 	Logger hclog.Logger
 	WebFS  fs.FS
+
+	// redemptionRL throttles public redemption (/open, /play) per pass+client.
+	// Populated by New when nil so callers don't have to construct it.
+	redemptionRL *redemptionLimiter
 }
+
+// Public redemption rate-limit defaults: allow a small burst then refill
+// slowly. Generous enough for a real guest retrying or switching items, tight
+// enough to throttle scripted hammering.
+const (
+	redemptionRate  = 1.0 / 3.0 // ~1 request per 3s sustained, per pass+client
+	redemptionBurst = 10        // absorb a short burst before throttling
+)
 
 // New constructs the fully-composed handler.
 func New(d Deps) http.Handler {
+	if d.redemptionRL == nil {
+		d.redemptionRL = newRedemptionLimiter(redemptionRate, redemptionBurst)
+	}
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
 

@@ -46,6 +46,43 @@ func parseExpiry(raw string, hours int) (time.Time, error) {
 	return now.Add(time.Duration(hours) * time.Hour), nil
 }
 
+// Upper bounds on admin-supplied per-pass limits. These guard against typos
+// (e.g. a stray extra digit) and abuse that would otherwise let a single
+// guest pass authorise a practically-unbounded number of plays, opens,
+// concurrent streams, or devices. A value of 0 from the admin means
+// "unlimited" for the open/play counters and is preserved; any positive
+// value is clamped to the corresponding cap.
+const (
+	maxOpensCap             = 10000
+	maxPlaysCap             = 10000
+	maxConcurrentStreamsCap = 20
+	maxDevicesCap           = 100
+	maxWatchMinutesCap      = 24 * 60 // a single sitting can't exceed one day
+)
+
+// capUnlimited clamps a non-negative limit where 0 means "unlimited": 0 is
+// preserved, anything above cap is reduced to cap.
+func capUnlimited(value, cap int) int {
+	value = nonNegative(value)
+	if value == 0 {
+		return 0
+	}
+	if value > cap {
+		return cap
+	}
+	return value
+}
+
+// capPositive clamps a limit that always has a concrete positive value:
+// non-positive falls back to fallback, anything above cap is reduced to cap.
+func capPositive(value, fallback, cap int) int {
+	value = defaultPositive(value, fallback)
+	if value > cap {
+		return cap
+	}
+	return value
+}
+
 func catalogMediaTypes(raw string) []string {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
 	case "movie":

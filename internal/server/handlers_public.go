@@ -68,13 +68,16 @@ func hPublicPassOpen(d Deps) http.HandlerFunc {
 		}
 
 		req := readAccessRequest(r)
+		if ok := enforceRedemptionRate(d, w, r, p, req, "open"); !ok {
+			return
+		}
 		if ok := verifyPassAccess(d, w, r, p, req, "open"); !ok {
 			return
 		}
 
 		if err := d.Store.RegisterDevice(r.Context(), p.ID, req.DeviceID, clientIP(r), r.UserAgent(), p.MaxDevices); err != nil {
 			if errors.Is(err, store.ErrDeviceLimit) {
-				_ = d.Store.RecordEvent(r.Context(), p.ID, "rejected_device_limit_reached", clientIP(r), r.UserAgent(), nil)
+				_ = d.Store.RecordEvent(r.Context(), p.ID, "rejected_device_limit_reached", clientIP(r), r.UserAgent(), redemptionAttrs(req, "device limit reached"))
 				writeJSON(w, http.StatusForbidden, map[string]any{"status": "device_limit_reached"})
 				return
 			}
@@ -85,14 +88,14 @@ func hPublicPassOpen(d Deps) http.HandlerFunc {
 		updated, err := d.Store.RecordOpen(r.Context(), p.ID, clientIP(r))
 		if err != nil {
 			if errors.Is(err, store.ErrOpenLimit) {
-				_ = d.Store.RecordEvent(r.Context(), p.ID, "rejected_open_limit_reached", clientIP(r), r.UserAgent(), nil)
+				_ = d.Store.RecordEvent(r.Context(), p.ID, "rejected_open_limit_reached", clientIP(r), r.UserAgent(), redemptionAttrs(req, "open limit reached"))
 				writeJSON(w, http.StatusForbidden, map[string]any{"status": "open_limit_reached"})
 				return
 			}
 			writeInternal(w, r, d, "open_failed", err)
 			return
 		}
-		_ = d.Store.RecordEvent(r.Context(), p.ID, "opened", clientIP(r), r.UserAgent(), nil)
+		_ = d.Store.RecordEvent(r.Context(), p.ID, "opened", clientIP(r), r.UserAgent(), redemptionAttrs(req, "open allowed"))
 		writeJSON(w, http.StatusOK, map[string]any{"pass": decoratePass(*updated, "", publicBaseURL(r, d), time.Now())})
 	}
 }
@@ -116,13 +119,16 @@ func hPlayAttempt(d Deps) http.HandlerFunc {
 			return
 		}
 		req := readAccessRequest(r)
+		if ok := enforceRedemptionRate(d, w, r, p, req, "play"); !ok {
+			return
+		}
 		if ok := verifyPassAccess(d, w, r, p, req, "play"); !ok {
 			return
 		}
 
 		if err := d.Store.RegisterDevice(r.Context(), p.ID, req.DeviceID, clientIP(r), r.UserAgent(), p.MaxDevices); err != nil {
 			if errors.Is(err, store.ErrDeviceLimit) {
-				_ = d.Store.RecordEvent(r.Context(), p.ID, "play_rejected_device_limit_reached", clientIP(r), r.UserAgent(), nil)
+				_ = d.Store.RecordEvent(r.Context(), p.ID, "play_rejected_device_limit_reached", clientIP(r), r.UserAgent(), redemptionAttrs(req, "device limit reached"))
 				writeJSON(w, http.StatusForbidden, map[string]any{"status": "device_limit_reached"})
 				return
 			}
@@ -133,7 +139,7 @@ func hPlayAttempt(d Deps) http.HandlerFunc {
 		updated, err := d.Store.RecordPlay(r.Context(), p.ID)
 		if err != nil {
 			if errors.Is(err, store.ErrPlayLimit) {
-				_ = d.Store.RecordEvent(r.Context(), p.ID, "play_rejected_play_limit_reached", clientIP(r), r.UserAgent(), nil)
+				_ = d.Store.RecordEvent(r.Context(), p.ID, "play_rejected_play_limit_reached", clientIP(r), r.UserAgent(), redemptionAttrs(req, "play limit reached"))
 				writeJSON(w, http.StatusForbidden, map[string]any{"status": "play_limit_reached"})
 				return
 			}
@@ -148,7 +154,7 @@ func hPlayAttempt(d Deps) http.HandlerFunc {
 			// failure doesn't burn a play against MaxPlays.
 			releasePlayCount(d, r, updated.ID)
 			if errors.Is(err, store.ErrConcurrencyLimit) {
-				_ = d.Store.RecordEvent(r.Context(), updated.ID, "play_rejected_concurrent_stream_limit_reached", clientIP(r), r.UserAgent(), nil)
+				_ = d.Store.RecordEvent(r.Context(), updated.ID, "play_rejected_concurrent_stream_limit_reached", clientIP(r), r.UserAgent(), redemptionAttrs(req, "concurrent stream limit reached"))
 				writeJSON(w, http.StatusTooManyRequests, map[string]any{"status": "concurrent_stream_limit_reached"})
 				return
 			}
@@ -191,6 +197,48 @@ func hPlayAttempt(d Deps) http.HandlerFunc {
 			"watermark":   watermarkText,
 			"logo_url":    updated.WatermarkLogoURL,
 		})
+	}
+}
+
+// enforceRedemptionRate applies the general per-(pass, client) redemption
+// rate limiter. The client portion of the key is the resolved client IP when
+// the host stamped one, falling back to the device id so requests without an
+// IP are still throttled per device. On throttle it audits the decision and
+// writes 429 with a Retry-After hint. Returns false after writing a response.
+//
+// This is independent of the bad-PIN lockout: it throttles all redemption
+// traffic (not just PIN failures) to blunt scripted hammering and retry loops.
+func enforceRedemptionRate(d Deps, w http.ResponseWriter, r *http.Request, p *store.Pass, req accessRequest, action string) bool {
+	if d.redemptionRL == nil {
+		return true
+	}
+	client := clientIP(r)
+	if client == "" {
+		client = req.DeviceID
+	}
+	key := strconv.Itoa(p.ID) + "|" + client
+	if d.redemptionRL.Allow(key) {
+		return true
+	}
+	_ = d.Store.RecordEvent(r.Context(), p.ID, action+"_rejected_rate_limited", clientIP(r), r.UserAgent(), redemptionAttrs(req, "redemption rate limit exceeded"))
+	w.Header().Set("Retry-After", "3")
+	writeJSON(w, http.StatusTooManyRequests, map[string]any{
+		"status":      "rate_limited",
+		"message":     "too many requests, slow down",
+		"retry_after": 3,
+	})
+	return false
+}
+
+// redemptionAttrs builds audit attrs for a public redemption decision,
+// stamping the requesting device (the closest thing to an "actor" on the
+// public route) and a human-readable reason alongside the precise reason
+// already encoded in the event_type. Keeps allow/deny decisions queryable
+// by device and reason.
+func redemptionAttrs(req accessRequest, reason string) map[string]any {
+	return map[string]any{
+		"device_id": req.DeviceID,
+		"reason":    reason,
 	}
 }
 

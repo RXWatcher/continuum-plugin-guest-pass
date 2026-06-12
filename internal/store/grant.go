@@ -58,6 +58,25 @@ func (s *Store) ReleaseGrantSlot(ctx context.Context, id int) error {
 	return err
 }
 
+// PruneExpiredGrants deletes grant rows whose expires_at is older than
+// gracePeriodHours before now. A short grace keeps very-recently-expired
+// rows around briefly (e.g. for diagnostics / race tolerance) before they
+// are reaped. Returns the number of rows removed. Called by the scheduled
+// task; ReserveGrantSlot already ignores expired rows for its count, so
+// this is purely storage hygiene.
+func (s *Store) PruneExpiredGrants(ctx context.Context, gracePeriodHours int) (int64, error) {
+	if gracePeriodHours < 0 {
+		gracePeriodHours = 0
+	}
+	tag, err := s.pool.Exec(ctx,
+		`DELETE FROM guest_pass_grants WHERE expires_at < NOW() - ($1::text || ' hours')::interval`,
+		gracePeriodHours)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
+
 // ActiveGrantCount is exposed for diagnostics; the playback flow uses
 // ReserveGrantSlot which checks and inserts atomically.
 func (s *Store) ActiveGrantCount(ctx context.Context, passID int) (int, error) {

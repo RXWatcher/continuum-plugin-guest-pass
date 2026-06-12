@@ -58,3 +58,31 @@ WHERE pass_id = $1 AND device_id = $2`, passID, deviceID, ip, ua)
 	}
 	return tx.Commit(ctx)
 }
+
+// PruneStaleDevices deletes registered-device rows that have not been seen
+// within retentionDays, and any device rows whose parent pass has already
+// expired (the pass's effective expiry is in the past). Returns the number
+// of rows removed.
+//
+// Reaping stale device rows keeps the MaxDevices accounting bounded over the
+// lifetime of long-lived passes and frees slots once a guest's device has
+// gone quiet past the retention window. Pass-level cascade deletes already
+// handle revoked/deleted passes; this additionally clears devices for passes
+// that have simply timed out.
+func (s *Store) PruneStaleDevices(ctx context.Context, retentionDays int) (int64, error) {
+	if retentionDays < 1 {
+		retentionDays = 1
+	}
+	tag, err := s.pool.Exec(ctx, `
+DELETE FROM guest_pass_devices d
+ WHERE d.last_seen_at < NOW() - ($1::text || ' days')::interval
+    OR EXISTS (
+        SELECT 1 FROM guest_passes p
+         WHERE p.id = d.pass_id
+           AND p.expires_at < NOW()
+    )`, retentionDays)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
