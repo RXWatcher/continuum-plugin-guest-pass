@@ -41,7 +41,9 @@ export function Guest() {
         const preview = await previewPass(token);
         if (cancelled) return;
         if (preview.require_pin) {
-          setPass(preview);
+          // The server withholds the full pass (target, policy, watermark)
+          // until the PIN is verified, so we only prompt here. The complete
+          // pass arrives from openPass once the guest unlocks.
           setPhase("needs_pin");
           return;
         }

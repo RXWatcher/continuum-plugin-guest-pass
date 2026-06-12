@@ -31,6 +31,10 @@ func TestParseExpiryAbsoluteAndRelative(t *testing.T) {
 	if !got.Equal(want) {
 		t.Fatalf("absolute expiry = %s, want %s", got, want)
 	}
+	// Excessive absolute (>1 year) is rejected, matching the relative cap.
+	if _, err := parseExpiry(time.Now().Add(24*366*time.Hour).Format(time.RFC3339), 0); err == nil {
+		t.Fatal("absolute expires_at beyond one year should fail")
+	}
 }
 
 func TestValidTargetTypeOnlyAllowsPlayableMediaFile(t *testing.T) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"strings"
 	"time"
@@ -217,6 +218,18 @@ WHERE id = $1
 	return p, err
 }
 
+// DecrementPlay reverses a RecordPlay increment. Used to compensate when a
+// play was counted but the downstream grant could not be produced (slot
+// reservation or host mint failed), so a failed attempt does not burn a
+// play against MaxPlays. Clamped at zero so it can never go negative.
+func (s *Store) DecrementPlay(ctx context.Context, passID int) error {
+	_, err := s.pool.Exec(ctx, `
+UPDATE guest_passes
+SET play_count = GREATEST(play_count - 1, 0), updated_at = NOW()
+WHERE id = $1`, passID)
+	return err
+}
+
 // RehashPIN replaces the stored PIN hash with a fresh bcrypt hash. Used by
 // the verify path when a legacy sha256 hash matched, to upgrade in place.
 func (s *Store) RehashPIN(ctx context.Context, passID int, pin string) error {
@@ -318,9 +331,19 @@ func scanPass(row passScanner) (*Pass, error) {
 	if err != nil {
 		return nil, err
 	}
-	_ = json.Unmarshal(ipAllowlist, &p.IPAllowlist)
-	_ = json.Unmarshal(countryAllowlist, &p.CountryAllowlist)
-	_ = json.Unmarshal(geofence, &p.Geofence)
+	// A corrupt allowlist/geofence column must fail closed: if we cannot
+	// decode the restriction we cannot prove the request is permitted, so
+	// surface the error rather than silently dropping the restriction
+	// (which would let any IP/country through).
+	if err := json.Unmarshal(ipAllowlist, &p.IPAllowlist); err != nil {
+		return nil, fmt.Errorf("decode ip_allowlist for pass %d: %w", p.ID, err)
+	}
+	if err := json.Unmarshal(countryAllowlist, &p.CountryAllowlist); err != nil {
+		return nil, fmt.Errorf("decode country_allowlist for pass %d: %w", p.ID, err)
+	}
+	if err := json.Unmarshal(geofence, &p.Geofence); err != nil {
+		return nil, fmt.Errorf("decode geofence for pass %d: %w", p.ID, err)
+	}
 	return &p, nil
 }
 

@@ -20,7 +20,7 @@ func hSPA(d Deps) http.HandlerFunc {
 			http.Error(w, "spa not available", http.StatusServiceUnavailable)
 			return
 		}
-		baseHref := pluginBaseHref(r)
+		baseHref := html.EscapeString(pluginBaseHref(r))
 		body = []byte(strings.Replace(string(body), "<head>", `<head><base href="`+baseHref+`">`, 1))
 		body = injectTheme(body, r)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")

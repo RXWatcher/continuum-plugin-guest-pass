@@ -23,13 +23,17 @@ func validAbsoluteURL(raw string) bool {
 // expiry. Falls back to 24 hours when both are zero. Caps at one year out
 // to prevent obvious typos creating effectively-permanent shares.
 func parseExpiry(raw string, hours int) (time.Time, error) {
+	now := time.Now()
 	if raw != "" {
 		t, err := time.Parse(time.RFC3339, raw)
 		if err != nil {
 			return time.Time{}, fmt.Errorf("expires_at must be RFC3339")
 		}
-		if !t.After(time.Now()) {
+		if !t.After(now) {
 			return time.Time{}, fmt.Errorf("expires_at must be in the future")
+		}
+		if t.After(now.Add(24 * 365 * time.Hour)) {
+			return time.Time{}, fmt.Errorf("expires_at cannot exceed one year from now")
 		}
 		return t, nil
 	}
@@ -39,7 +43,7 @@ func parseExpiry(raw string, hours int) (time.Time, error) {
 	if hours > 24*365 {
 		return time.Time{}, fmt.Errorf("expires_in_hours cannot exceed one year")
 	}
-	return time.Now().Add(time.Duration(hours) * time.Hour), nil
+	return now.Add(time.Duration(hours) * time.Hour), nil
 }
 
 func catalogMediaTypes(raw string) []string {
