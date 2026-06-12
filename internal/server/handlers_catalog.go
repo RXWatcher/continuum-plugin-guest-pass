@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strings"
 
-	sdkruntime "github.com/ContinuumApp/continuum-plugin-sdk/pkg/pluginsdk/runtime"
-	"github.com/ContinuumApp/continuum-plugin-sdk/pkg/pluginsdk/runtimehost"
+	sdkruntime "github.com/Silo-Server/silo-plugin-sdk/pkg/pluginsdk/runtime"
+	"github.com/Silo-Server/silo-plugin-sdk/pkg/pluginsdk/runtimehost"
 )
 
 // hSearchCatalog asks the host for matching media items via the SDK

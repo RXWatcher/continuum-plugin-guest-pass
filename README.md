@@ -24,7 +24,7 @@ Standalone sharing layer. The plugin does not depend on other plugins for core o
 - Final content-ID → media-file-ID resolution at pass-creation time reads `public.media_files` directly (a `SELECT` grant on that single table is required until the SDK exposes a resolver call).
 - Guest playback flows through the host's scoped stream grants — the plugin never exposes broad library permissions to the public route.
 
-Host: [`ContinuumApp/silo`](https://github.com/ContinuumApp/silo). SDK: [`ContinuumApp/continuum-plugin-sdk`](https://github.com/ContinuumApp/continuum-plugin-sdk).
+Host: [`Silo-Server/silo-server`](https://github.com/Silo-Server/silo-server). SDK: [`Silo-Server/silo-plugin-sdk`](https://github.com/Silo-Server/silo-plugin-sdk).
 
 ## External services
 
